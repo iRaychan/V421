@@ -13,7 +13,7 @@
   if(window.top!==window.self||window.__KEYSUITE_V40001_CUSTOMER_BRAND_SETTINGS__)return;
   window.__KEYSUITE_V40001_CUSTOMER_BRAND_SETTINGS__=true;
 
-  const VERSION='4.18.11';
+  const VERSION='4.21.01';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const low=v=>norm(v).toLowerCase();
@@ -58,9 +58,9 @@
   const normalizeGroup=v=>String(v??'').trim().toUpperCase().replace(/\s+/g,'_');
   const hydraulicFamily=v=>{
     const g=normalizeGroup(v);
-    if(g==='CHC'||g==='CHC_G2')return 'CHC';
+    if(g==='CHC'||g==='CHC_G1'||g==='CHC_G2')return 'CHC';
     if(g==='ES')return 'ES';
-    return ''; // CHC_G1 intentionally has no hydraulic Customer/Quick Selection entry yet.
+    return '';
   };
   const keyOf=(bid,f)=>`${String(bid)}|${String(f).toUpperCase()}`;
   const priceKeyOf=(bid,g)=>`${String(bid)}|${normalizeGroup(g)==='CHC'?'CHC_G2':normalizeGroup(g)}`;
@@ -86,12 +86,14 @@
     const out=[];
     brands().forEach(b=>{
       if(isMaster(b)){
+        out.push({brand:b,family:'CHC',productGroup:'CHC_G1',key:keyOf(b.id,'CHC_G1')});
         out.push({brand:b,family:'CHC',productGroup:'CHC_G2',key:keyOf(b.id,'CHC')});
         out.push({brand:b,family:'ES',productGroup:'ES',key:keyOf(b.id,'ES')});
         return;
       }
       const groups=mappings().filter(m=>String(m.brand_id)===String(b.id)).map(m=>normalizeGroup(m.master_family));
-      // Old CHC is CHC G2. G1 is intentionally not a hydraulic entry.
+      // V4.21.01: CHC G1 and G2 are independent hydraulic Selection entries.
+      if(groups.includes('CHC_G1'))out.push({brand:b,family:'CHC',productGroup:'CHC_G1',key:keyOf(b.id,'CHC_G1')});
       if(groups.includes('CHC_G2')||groups.includes('CHC'))out.push({brand:b,family:'CHC',productGroup:'CHC_G2',key:keyOf(b.id,'CHC')});
       if(groups.includes('ES'))out.push({brand:b,family:'ES',productGroup:'ES',key:keyOf(b.id,'ES')});
     });
@@ -112,7 +114,7 @@
     const out=[];
     brands().forEach(b=>{
       if(isMaster(b)){
-        out.push({brand:b,priceGroup:'CHC_G1',family:'CHC',selectionKey:'',key:priceKeyOf(b.id,'CHC_G1')});
+        out.push({brand:b,priceGroup:'CHC_G1',family:'CHC',selectionKey:keyOf(b.id,'CHC_G1'),key:priceKeyOf(b.id,'CHC_G1')});
         out.push({brand:b,priceGroup:'CHC_G2',family:'CHC',selectionKey:keyOf(b.id,'CHC'),key:priceKeyOf(b.id,'CHC_G2')});
         out.push({brand:b,priceGroup:'ES',family:'ES',selectionKey:keyOf(b.id,'ES'),key:priceKeyOf(b.id,'ES')});
         out.push({brand:b,priceGroup:'MOTOR',family:'MOTOR',selectionKey:'',key:priceKeyOf(b.id,'MOTOR'),label:'Motor'});
@@ -128,7 +130,7 @@
         brand:b,
         priceGroup:g,
         family:g==='ES'?'ES':g==='MOTOR'?'MOTOR':'CHC',
-        selectionKey:g==='CHC_G2'?keyOf(b.id,'CHC'):g==='ES'?keyOf(b.id,'ES'):'',
+        selectionKey:g==='CHC_G1'?keyOf(b.id,'CHC_G1'):g==='CHC_G2'?keyOf(b.id,'CHC'):g==='ES'?keyOf(b.id,'ES'):'',
         key:priceKeyOf(b.id,g),
         label:g==='MOTOR'?'Motor':''
       }));
@@ -171,7 +173,6 @@
   }
   function noHydraulicStatus(brandId){
     const groups=priceGroupsForBrand(brandId);
-    if(groups.includes('CHC_G1'))return 'CHC G1 · Price / Quote available · Curve / Selection unavailable';
     return 'No hydraulic Selection series configured for this Brand.';
   }
   function defaultPreference(){
@@ -589,11 +590,10 @@
   }
   function isSelectionAllowed(brandId,priceGroup,cid=currentPreferenceCustomerId()){
     const group=normalizedPriceGroup(priceGroup);
-    if(group==='CHC_G1')return false;
-    if(!['CHC_G2','ES'].includes(group))return false;
+    if(!['CHC_G1','CHC_G2','ES'].includes(group))return false;
     if(isPriceAllowed(brandId,group,cid)!==true)return false;
     const pref=cache.get(String(cid));if(!pref)return false;
-    const selectionKey=group==='CHC_G2'?keyOf(brandId,'CHC'):keyOf(brandId,'ES');
+    const selectionKey=group==='CHC_G1'?keyOf(brandId,'CHC_G1'):group==='CHC_G2'?keyOf(brandId,'CHC'):keyOf(brandId,'ES');
     return new Set(pref.keys||[]).has(selectionKey);
   }
   function rowPriceIdentity(row){

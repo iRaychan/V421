@@ -1,4 +1,4 @@
-/* KeySuite V4.17.04 — Quick Pump Selection account-scope + customer Price-gated Brand / Series.
+/* KeySuite V4.21.01 — Quick Pump Selection account-scope + customer Price-gated Brand / Series.
    Preserves the user-entered Quick Selection flow/head units into the selected-model view and PDF.
    Hydraulic selection remains in m³/hr and metres. */
 (() => {
@@ -25,8 +25,8 @@ const accountAllows=(brandId,family)=>{
 const DEFAULT_CHC_MATERIAL='SS304 (Cast Iron Connection)';
 const FAMILIES=['CHC','ES'];
 const normalizeGroup=v=>upper(v).replace(/\s+/g,'_');
-const hydraulicFamily=v=>{const g=normalizeGroup(v);return g==='CHC'||g==='CHC_G2'?'CHC':g==='ES'?'ES':''};
-const state={requestId:0,pending:null,results:{},responded:{},savedKeys:new Set(),prefLoaded:false,queue:[],currentFamily:null,familyTimer:null,preferenceLoading:false,customerPriceLoading:false,customerPriceError:'',customerPriceErrorCid:'',enhancedCHC:false};
+const hydraulicFamily=v=>{const g=normalizeGroup(v);return g==='CHC'||g==='CHC_G1'||g==='CHC_G2'?'CHC':g==='ES'?'ES':''};
+const state={requestId:0,pending:null,results:{},responded:{},savedKeys:new Set(),prefLoaded:false,queue:[],currentEntry:null,currentFamily:null,familyTimer:null,preferenceLoading:false,customerPriceLoading:false,customerPriceError:'',customerPriceErrorCid:'',enhancedCHC:false};
 const isKeylargo=b=>norm(b?.brand_key).toLowerCase()==='keylargo';
 const isMaster=b=>String(b?.brand_type||'').toLowerCase()==='master'||norm(b?.brand_key).toLowerCase()==='b.g.reich'||norm(b?.brand_name).toLowerCase()==='b.g.reich';
 const brands=()=>((api()?.state?.brands)||[]).filter(b=>b&&b.active!==false&&!isKeylargo(b));
@@ -51,12 +51,14 @@ function entries(){
   const out=[];
   brands().forEach(b=>{
     if(isMaster(b)){
+      out.push({brand:b,family:'CHC',productGroup:'CHC_G1',key:keyOf(b.id,'CHC_G1')});
       out.push({brand:b,family:'CHC',productGroup:'CHC_G2',key:keyOf(b.id,'CHC')});
       out.push({brand:b,family:'ES',productGroup:'ES',key:keyOf(b.id,'ES')});
       return;
     }
     const groups=mappings().filter(m=>String(m.brand_id)===String(b.id)).map(m=>normalizeGroup(m.master_family));
-    // Old CHC is CHC G2. CHC G1 stays out until a real G1 hydraulic curve exists.
+    // V4.21.01: G1 and G2 are separate CHC hydraulic generations.
+    if(groups.includes('CHC_G1'))out.push({brand:b,family:'CHC',productGroup:'CHC_G1',key:keyOf(b.id,'CHC_G1')});
     if(groups.includes('CHC_G2')||groups.includes('CHC'))out.push({brand:b,family:'CHC',productGroup:'CHC_G2',key:keyOf(b.id,'CHC')});
     if(groups.includes('ES'))out.push({brand:b,family:'ES',productGroup:'ES',key:keyOf(b.id,'ES')});
   });
@@ -72,7 +74,6 @@ function priceGroupsForBrand(brandId){
 }
 function noHydraulicStatus(brandId){
   const groups=priceGroupsForBrand(brandId);
-  if(groups.includes('CHC_G1'))return 'CHC G1 · Price / Quote available · Curve / Selection unavailable';
   return 'No hydraulic Selection series configured for this Brand.';
 }
 const customerPrefApi=()=>window.KeySuiteV40001CustomerBrandSettings||window.KeySuiteV3964CustomerBrandSettings||null;
@@ -131,8 +132,7 @@ function customerPriceScope(){
   return {cid,ready:!pending,entries:allowed,error:''};
 }
 const selectedEntries=()=>customerPriceScope().entries.filter(e=>state.savedKeys.has(e.key));
-const selectedFamilies=()=>[...new Set(selectedEntries().map(e=>e.family))];
-function aliasModel(model,e){const raw=norm(model),series=seriesFor(e.brand,e.family);if(!raw)return raw;if(e.family==='CHC')return raw.replace(/^(?:CHCS|CHCN|CHC)\b/i,series);if(e.family==='ES'&&!isMaster(e.brand)&&series!=='ES')return raw.replace(/^ES\b/i,series);return raw}
+function aliasModel(model,e){const raw=norm(model),series=seriesFor(e.brand,e.family,e.productGroup);if(!raw)return raw;if(e.family==='CHC')return raw.replace(/^(?:CHCS|CHCN|CHC)\b/i,series);if(e.family==='ES'&&!isMaster(e.brand)&&series!=='ES')return raw.replace(/^ES\b/i,series);return raw}
 function enhancedAliasModel(model,e,enhanced){const shown=aliasModel(model,e);return enhanced&&shown&&!/E$/i.test(shown)?shown+'E':shown}
 const n=v=>{const x=Number(v);return Number.isFinite(x)?x:null};
 const kw=v=>{const x=n(v);if(x==null)return '—';const d=x>=10?1:2;return `${Number(x.toFixed(d))}kW`};
@@ -261,7 +261,7 @@ function renderPreference(){
     grid.innerHTML='<div class="ks39444-brand-state"><b>No Brand / Series Price is enabled for this customer.</b><div class="muted" style="margin-top:4px">Tick Price for the required Brand / Series under Key → Customer. Unticked series stay hidden from Quick Selection.</div></div>';
     return;
   }
-  const enhancedAnchor=((all.find(e=>e.family==='CHC'&&isMaster(e.brand))||all.find(e=>e.family==='CHC'))?.key||'');
+  const enhancedAnchor=((all.find(e=>e.family==='CHC'&&normalizeGroup(e.productGroup)==='CHC_G2'&&isMaster(e.brand))||all.find(e=>e.family==='CHC'&&normalizeGroup(e.productGroup)==='CHC_G2'))?.key||'');
   visible.forEach(b=>{
     const mine=all.filter(e=>String(e.brand.id)===String(b.id)),card=document.createElement('div');
     card.className='ks39442-pref-brand';
@@ -282,18 +282,27 @@ function renderPreference(){
   });
 }
 
-function frame(f){return $(f==='CHC'?'selectorFrame':'selectorEsFrame')}
-function ensureFrame(f){const x=frame(f),src=f==='CHC'?'selector/index.html':'selector-es/index.html';if(x&&(!x.getAttribute('src')||x.getAttribute('src')==='about:blank'))x.src=x.dataset.src||src;return x}
+const entryFamily=value=>upper(typeof value==='string'?value:value?.family);
+const chcGeneration=value=>normalizeGroup(typeof value==='string'?'':value?.productGroup)==='CHC_G1'?'G1':'G2';
+const entryKey=value=>typeof value==='string'?upper(value):String(value?.key||entryFamily(value));
+function frame(value){return $(entryFamily(value)==='CHC'?'selectorFrame':'selectorEsFrame')}
+function expectedFrameSrc(value,x=frame(value)){
+  const family=entryFamily(value);
+  if(family==='CHC')return chcGeneration(value)==='G1'?(x?.dataset?.g1Src||'selector-g1/index.html?v=42101'):(x?.dataset?.g2Src||x?.dataset?.src||'selector/index.html?v=42101');
+  return x?.dataset?.src||'selector-es/index.html';
+}
+function ensureFrameState(value){const x=frame(value);if(!x)return {frame:null,changed:false};const src=expectedFrameSrc(value,x),current=String(x.getAttribute('src')||'');const expectedPath=entryFamily(value)==='CHC'?(chcGeneration(value)==='G1'?'selector-g1/index.html':'selector/index.html'):'selector-es/index.html';const changed=!current.includes(expectedPath);if(changed)x.setAttribute('src',src);return {frame:x,changed}}
+function ensureFrame(value){return ensureFrameState(value).frame}
 function frameReady(x){try{return !!x?.contentWindow&&x.contentDocument?.readyState==='complete'}catch(_){return false}}
-function waitFrameReady(f,requestId){return new Promise(resolve=>{const x=ensureFrame(f);if(!x){resolve(false);return}if(frameReady(x)){resolve(true);return}let done=false;const finish=v=>{if(done)return;done=true;x.removeEventListener('load',onload);clearTimeout(timer);resolve(v)};const onload=()=>finish(state.pending?.requestId===requestId);x.addEventListener('load',onload,{once:true});const timer=setTimeout(()=>finish(frameReady(x)&&state.pending?.requestId===requestId),4500)})}
-function sendOnce(f,msg){const x=ensureFrame(f);try{x?.contentWindow?.postMessage(msg,'*');return true}catch(_){return false}}
+function waitFrameReady(value,requestId){return new Promise(resolve=>{const prepared=ensureFrameState(value),x=prepared.frame;if(!x){resolve(false);return}if(!prepared.changed&&frameReady(x)){resolve(true);return}let done=false;const finish=v=>{if(done)return;done=true;x.removeEventListener('load',onload);clearTimeout(timer);resolve(v)};const onload=()=>finish(state.pending?.requestId===requestId);x.addEventListener('load',onload,{once:true});const timer=setTimeout(()=>finish(frameReady(x)&&state.pending?.requestId===requestId),4500)})}
+function sendOnce(value,msg){const x=ensureFrame(value);try{x?.contentWindow?.postMessage(msg,'*');return true}catch(_){return false}}
 function clearFamilyTimer(){if(state.familyTimer){clearTimeout(state.familyTimer);state.familyTimer=null}}
-function cancelPending(){clearFamilyTimer();state.queue=[];state.currentFamily=null;state.pending=null}
-async function processNext(requestId){if(state.pending?.requestId!==requestId)return;clearFamilyTimer();const f=state.queue.shift();if(!f){state.currentFamily=null;renderResults(true);return}state.currentFamily=f;const status=$('ksDutyStatus');if(status)status.textContent=`Checking ${f}…`;const ready=await waitFrameReady(f,requestId);if(state.pending?.requestId!==requestId)return;if(!ready){state.responded[f]=true;state.results[f]={suitable:false,data:null,error:'Selector unavailable'};processNext(requestId);return}const req=state.pending;const sent=sendOnce(f,{type:'KEYSUITE_DASHBOARD_SELECT',requestId:req.requestId,flowM3h:req.flowM3h,headM:req.headM,rawFlow:req.rawFlow,rawHead:req.rawHead,rawFlowText:req.rawFlowText,rawHeadText:req.rawHeadText,flowUnit:req.flowUnit,headUnit:req.headUnit,quickSelection:true,enhanced:f==='CHC'&&!!req.enhancedCHC});if(!sent){state.responded[f]=true;state.results[f]={suitable:false,data:null,error:'Selector unavailable'};processNext(requestId);return}state.familyTimer=setTimeout(()=>{if(state.pending?.requestId!==requestId||state.currentFamily!==f)return;state.responded[f]=true;state.results[f]={suitable:false,data:null,error:'Selection timeout'};processNext(requestId)},6500)}
-function runSelected(){if(!canQuick())return;if(!api()?.state?.coreReady){renderBrandState();const st=$('ksDutyStatus');if(st)st.textContent='Brand data must load before Quick Pump Selection.';return}if(!state.prefLoaded){loadPreference();return}syncChecks();const fams=selectedFamilies(),flow=$('ksDashFlow'),head=$('ksDashHead'),fu=$('ksDashFlowUnit'),hu=$('ksDashHeadUnit'),status=$('ksDutyStatus'),host=$('ksV39442Results');cancelPending();state.results={};state.responded={};if(host)host.innerHTML='';const q=flowToM3h(flow?.value,fu?.value||'m3h'),h=headToM(head?.value,hu?.value||'m');if(!(q>0&&h>0)){if(status)status.textContent='Enter Flow and Head.';return}if(!fams.length){if(status)status.textContent='Select at least one Brand / Series.';return}state.enhancedCHC=!!$('ksQuickEnhanced')?.checked;const req={requestId:944000000+(++state.requestId),flowM3h:q,headM:h,rawFlow:Number(flow?.value),rawHead:Number(head?.value),rawFlowText:String(flow?.value??'').trim(),rawHeadText:String(head?.value??'').trim(),flowUnit:fu?.value||'m3h',headUnit:hu?.value||'m',fams:[...fams],enhancedCHC:state.enhancedCHC};state.pending=req;state.queue=[...fams];if(status)status.textContent='Checking selected pump series…';processNext(req.requestId)}
+function cancelPending(){clearFamilyTimer();state.queue=[];state.currentEntry=null;state.currentFamily=null;state.pending=null}
+async function processNext(requestId){if(state.pending?.requestId!==requestId)return;clearFamilyTimer();const e=state.queue.shift();if(!e){state.currentEntry=null;state.currentFamily=null;renderResults(true);return}state.currentEntry=e;state.currentFamily=e.family;const key=entryKey(e),status=$('ksDutyStatus');if(status)status.textContent=`Checking ${brandSeriesFor(e.brand,e.family,e.productGroup)}…`;const ready=await waitFrameReady(e,requestId);if(state.pending?.requestId!==requestId)return;if(!ready){state.responded[key]=true;state.results[key]={suitable:false,data:null,error:'Selector unavailable'};state.currentEntry=null;state.currentFamily=null;processNext(requestId);return}const req=state.pending,isG2=chcGeneration(e)==='G2';const sent=sendOnce(e,{type:'KEYSUITE_DASHBOARD_SELECT',requestId:req.requestId,flowM3h:req.flowM3h,headM:req.headM,rawFlow:req.rawFlow,rawHead:req.rawHead,rawFlowText:req.rawFlowText,rawHeadText:req.rawHeadText,flowUnit:req.flowUnit,headUnit:req.headUnit,quickSelection:true,enhanced:e.family==='CHC'&&isG2&&!!req.enhancedCHC});if(!sent){state.responded[key]=true;state.results[key]={suitable:false,data:null,error:'Selector unavailable'};state.currentEntry=null;state.currentFamily=null;processNext(requestId);return}state.familyTimer=setTimeout(()=>{if(state.pending?.requestId!==requestId||entryKey(state.currentEntry)!==key)return;state.responded[key]=true;state.results[key]={suitable:false,data:null,error:'Selection timeout'};state.currentEntry=null;state.currentFamily=null;processNext(requestId)},6500)}
+function runSelected(){if(!canQuick())return;if(!api()?.state?.coreReady){renderBrandState();const st=$('ksDutyStatus');if(st)st.textContent='Brand data must load before Quick Pump Selection.';return}if(!state.prefLoaded){loadPreference();return}syncChecks();const selected=selectedEntries(),flow=$('ksDashFlow'),head=$('ksDashHead'),fu=$('ksDashFlowUnit'),hu=$('ksDashHeadUnit'),status=$('ksDutyStatus'),host=$('ksV39442Results');cancelPending();state.results={};state.responded={};if(host)host.innerHTML='';const q=flowToM3h(flow?.value,fu?.value||'m3h'),h=headToM(head?.value,hu?.value||'m');if(!(q>0&&h>0)){if(status)status.textContent='Enter Flow and Head.';return}if(!selected.length){if(status)status.textContent='Select at least one Brand / Series.';return}state.enhancedCHC=!!$('ksQuickEnhanced')?.checked;const req={requestId:944000000+(++state.requestId),flowM3h:q,headM:h,rawFlow:Number(flow?.value),rawHead:Number(head?.value),rawFlowText:String(flow?.value??'').trim(),rawHeadText:String(head?.value??'').trim(),flowUnit:fu?.value||'m3h',headUnit:hu?.value||'m',entries:selected.map(e=>e.key),enhancedCHC:state.enhancedCHC};state.pending=req;state.queue=[...selected];if(status)status.textContent='Checking selected pump series…';processNext(req.requestId)}
 
 function modelButton(e,data,defaultEff='IE3'){const b=document.createElement('button');b.type='button';b.className='ks39442-model';const enhanced=e.family==='CHC'&&!!data?.enhanced;b.innerHTML=`<span class="ks39442-model-name"><b>${esc(enhancedAliasModel(data?.model,e,enhanced))}</b>${enhanced?'<span class="ks405-enhanced-tag">Enhanced</span>':''}</span><span class="ks39442-value">${kw(data?.motor_kw)}</span><span class="ks39442-value">${poleFrom(data)}</span><span class="ks39442-value">${esc(effClass(data,defaultEff))}</span>`;b.onclick=()=>openCurve(e,data);return b}
-function renderResults(final=false){const host=$('ksV39442Results'),status=$('ksDutyStatus');if(!host)return;host.innerHTML='';let shown=0;selectedEntries().forEach(e=>{const r=state.results[e.family];if(!r?.suitable||!r.data)return;shown++;const series=brandSeriesFor(e.brand,e.family,e.productGroup),isEnhanced=e.family==='CHC'&&!!r.data.enhanced,seriesLabel=`${e.brand.brand_name} · ${series}${isEnhanced?' · Enhanced':''}`,sec=document.createElement('section');sec.className='ks39442-series';sec.innerHTML=`<button class="ks39442-series-head" type="button">${esc(seriesLabel)} ▼</button><div class="ks39442-series-body"><div class="ks39442-columns"><span>Pump Model</span><span>Motor kW</span><span>Pole</span><span>Eff</span></div><div class="ks39442-section">Most Suitable</div><div class="ks39442-rec"></div><div class="ks39442-section">Alternative Models</div><div class="ks39442-alt"></div></div>`;const body=sec.querySelector('.ks39442-series-body'),head=sec.querySelector('.ks39442-series-head');head.onclick=()=>{body.hidden=!body.hidden;head.textContent=`${seriesLabel}${body.hidden?' ▸':' ▼'}`};const defaultEff=effClass(r.data,'IE3');sec.querySelector('.ks39442-rec').appendChild(modelButton(e,r.data,defaultEff));const alts=Array.isArray(r.data.alternatives)?r.data.alternatives:[];alts.forEach(a=>sec.querySelector('.ks39442-alt').appendChild(modelButton(e,a,defaultEff)));if(!alts.length)sec.querySelector('.ks39442-alt').innerHTML='<div class="muted" style="font-size:12px">No alternative model.</div>';host.appendChild(sec)});if(shown){if(status&&!state.currentFamily)status.textContent=`${shown} Brand / Series result${shown===1?'':'s'} available.`;return}const wait=state.pending&&state.queue.length+Number(!!state.currentFamily)>0;if(!final&&wait){if(status)status.textContent='Checking selected pump series…';return}if(status&&!state.currentFamily)status.textContent='No suitable model found for the selected Brand / Series.'}
+function renderResults(final=false){const host=$('ksV39442Results'),status=$('ksDutyStatus');if(!host)return;host.innerHTML='';let shown=0;selectedEntries().forEach(e=>{const r=state.results[e.key];if(!r?.suitable||!r.data)return;shown++;const series=brandSeriesFor(e.brand,e.family,e.productGroup),isEnhanced=e.family==='CHC'&&!!r.data.enhanced,seriesLabel=`${e.brand.brand_name} · ${series}${isEnhanced?' · Enhanced':''}`,sec=document.createElement('section');sec.className='ks39442-series';sec.innerHTML=`<button class="ks39442-series-head" type="button">${esc(seriesLabel)} ▼</button><div class="ks39442-series-body"><div class="ks39442-columns"><span>Pump Model</span><span>Motor kW</span><span>Pole</span><span>Eff</span></div><div class="ks39442-section">Most Suitable</div><div class="ks39442-rec"></div><div class="ks39442-section">Alternative Models</div><div class="ks39442-alt"></div></div>`;const body=sec.querySelector('.ks39442-series-body'),head=sec.querySelector('.ks39442-series-head');head.onclick=()=>{body.hidden=!body.hidden;head.textContent=`${seriesLabel}${body.hidden?' ▸':' ▼'}`};const defaultEff=effClass(r.data,normalizeGroup(e.productGroup)==='CHC_G1'?'IE2':'IE3');sec.querySelector('.ks39442-rec').appendChild(modelButton(e,r.data,defaultEff));const alts=Array.isArray(r.data.alternatives)?r.data.alternatives:[];alts.forEach(a=>sec.querySelector('.ks39442-alt').appendChild(modelButton(e,a,defaultEff)));if(!alts.length)sec.querySelector('.ks39442-alt').innerHTML='<div class="muted" style="font-size:12px">No alternative model.</div>';host.appendChild(sec)});if(shown){if(status&&!state.currentEntry)status.textContent=`${shown} Brand / Series result${shown===1?'':'s'} available.`;return}const wait=state.pending&&state.queue.length+Number(!!state.currentEntry)>0;if(!final&&wait){if(status)status.textContent='Checking selected pump series…';return}if(status&&!state.currentEntry)status.textContent='No suitable model found for the selected Brand / Series.'}
 function setDefaultChcPayload(fr){try{const w=fr?.contentWindow;w.keysuiteExportPayload={...(w.keysuiteExportPayload||{}),keysuite_material:DEFAULT_CHC_MATERIAL,keysuite_seal:'Car/Cer',keysuite_elastomer:'Viton',keysuite_connection:'round',keysuite_bare_shaft:false}}catch(_){}}
 function presentationContext(e,data){
   const a=api(),family=upper(e?.family),group=normalizeGroup(e?.productGroup||family),base=a?.brandContext?.(e?.brand?.id,family,'',group)||{};
@@ -308,22 +317,22 @@ function pinFrameContext(fr,ctx){
 async function openCurve(e,data){
   const req=state.pending;if(!req||!data)return;const page=e.family==='ES'?'selectorEs':'selector';
   try{api()?.setSelectedBrand?.(e.brand.id,e.family,page,e.productGroup||e.family)}catch(_){}
-  if(e.family==='CHC'){const mat=$('pumpMaterial');if(mat){mat.value=DEFAULT_CHC_MATERIAL;mat.dispatchEvent(new Event('change',{bubbles:true}))}}
-  const fr=ensureFrame(e.family),ready=await waitFrameReady(e.family,req.requestId);if(!ready)return;
+  if(e.family==='CHC'){window.KeySuiteCHCSelection?.setGeneration?.(chcGeneration(e));const mat=$('pumpMaterial');if(mat){mat.value=DEFAULT_CHC_MATERIAL;mat.dispatchEvent(new Event('change',{bubbles:true}))}}
+  const fr=ensureFrame(e),ready=await waitFrameReady(e,req.requestId);if(!ready)return;
   if(e.family==='CHC')setDefaultChcPayload(fr);
   const ctx=presentationContext(e,data);pinFrameContext(fr,ctx);
   try{window.KeySuiteSelectorBrand?.collapseSummaryForFrame?.(fr)}catch(_){}
   try{window.KeySuiteModelReturn?.markQuickSelection?.(e.family)}catch(_){}
   window.__KEYSUITE_PRESERVE_SELECTOR_BRAND_ONCE__={page,family:e.family,brandId:String(e.brand.id),context:ctx};
   window.__KEYSUITE_QUICK_SELECTION_OPENING__={family:e.family,expires:Date.now()+3000};
-  const nav=document.querySelector(`button[data-page="${page}"]`);if(nav)nav.click();
+  if(window.KeySuiteApp?.showPage)window.KeySuiteApp.showPage(page);else{const nav=document.querySelector(`button[data-page="${page}"]`);if(nav)nav.click();}
   setTimeout(()=>{if(window.__KEYSUITE_QUICK_SELECTION_OPENING__?.family===e.family)delete window.__KEYSUITE_QUICK_SELECTION_OPENING__},3000);
   setTimeout(()=>{
     if(state.pending?.requestId!==req.requestId)return;
     try{if(window.__KEYSUITE_PRESERVE_SELECTOR_BRAND_ONCE__?.context===ctx)delete window.__KEYSUITE_PRESERVE_SELECTOR_BRAND_ONCE__}catch(_){}
     try{api()?.setSelectedBrand?.(e.brand.id,e.family,page,e.productGroup||e.family)}catch(_){}
     pinFrameContext(fr,ctx);if(e.family==='CHC')setDefaultChcPayload(fr);
-    sendOnce(e.family,{type:'KEYSUITE_DASHBOARD_OPEN_MODEL',requestId:req.requestId,flowM3h:req.flowM3h,headM:req.headM,rawFlow:req.rawFlow,rawHead:req.rawHead,rawFlowText:req.rawFlowText,rawHeadText:req.rawHeadText,flowUnit:req.flowUnit,headUnit:req.headUnit,quickSelection:true,enhanced:e.family==='CHC'&&!!data.enhanced,model:data.model||''});
+    sendOnce(e,{type:'KEYSUITE_DASHBOARD_OPEN_MODEL',requestId:req.requestId,flowM3h:req.flowM3h,headM:req.headM,rawFlow:req.rawFlow,rawHead:req.rawHead,rawFlowText:req.rawFlowText,rawHeadText:req.rawHeadText,flowUnit:req.flowUnit,headUnit:req.headUnit,quickSelection:true,enhanced:e.family==='CHC'&&chcGeneration(e)==='G2'&&!!data.enhanced,model:data.model||''});
     setTimeout(()=>{if(state.pending?.requestId!==req.requestId)return;pinFrameContext(fr,ctx);try{window.KeySuiteSelectorBrand?.collapseSummaryForFrame?.(fr);window.KeySuiteSelectorBrand?.refresh?.(fr)}catch(_){}},100);
   },0);
 }
@@ -334,7 +343,7 @@ function bind(){const box=$('ksDashboardDutyFinder');if(!box||box.dataset.v39444
   box.addEventListener('click',ev=>{if(ev.target.closest('#ksDashSelect')){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();runSelected()}},true);
   const changed=ev=>{if(!ev.target.matches('#ksDashFlow,#ksDashHead,#ksDashFlowUnit,#ksDashHeadUnit,#ksQuickEnhanced'))return;if(ev.target.id==='ksQuickEnhanced')state.enhancedCHC=!!ev.target.checked;ev.stopPropagation();ev.stopImmediatePropagation();cancelPending();const st=$('ksDutyStatus');if(st)st.textContent='Press Check Pumps to update results.'};
   box.addEventListener('input',changed,true);box.addEventListener('change',changed,true);return true}
-function message(ev){const m=ev.data||{};if(m.type!=='KEYSUITE_DASHBOARD_RESULT'||m.requestId!==state.pending?.requestId||!FAMILIES.includes(upper(m.family)))return;const f=upper(m.family);if(f!==state.currentFamily)return;clearFamilyTimer();state.responded[f]=true;state.results[f]={suitable:!!m.suitable,data:m.data||null};state.currentFamily=null;renderResults(false);processNext(m.requestId)}
+function message(ev){const m=ev.data||{};if(m.type!=='KEYSUITE_DASHBOARD_RESULT'||m.requestId!==state.pending?.requestId||!FAMILIES.includes(upper(m.family)))return;const f=upper(m.family),e=state.currentEntry;if(!e||f!==upper(e.family))return;const key=entryKey(e);clearFamilyTimer();state.responded[key]=true;state.results[key]={suitable:!!m.suitable,data:m.data||null};state.currentEntry=null;state.currentFamily=null;renderResults(false);processNext(m.requestId)}
 function mark(){document.title=document.title.replace(/V3\.9\.4(?:\.\d+)*|V3\.9\.3|V3\.9\.2|V3\.9\.1/g,'V3.9.4.4.11');document.querySelectorAll('.suite-version').forEach(n=>n.textContent='KeySuite V3.9.4.4.11')}
 function setup(){style();mark();if(!ensureUi()||!bind())return false;removeMaterialControls();if(api()?.state?.coreReady){if(!state.prefLoaded)loadPreference();else{renderPreference();renderResults(true)}}else renderBrandState();return true}
 window.addEventListener('message',message,true);
@@ -348,7 +357,7 @@ window.addEventListener('KEYSUITE_CUSTOMER_BRAND_PREFERENCE_CHANGED',event=>{
 });
 window.addEventListener('KEYSUITE_BRANDS_ERROR',()=>{state.prefLoaded=false;renderBrandState()});
 window.addEventListener('KEYSUITE_V393_BRAND_CONTEXT_CHANGED',()=>{if(!api()?.state?.coreReady)return;if(!state.prefLoaded){loadPreference();return}const valid=new Set(entries().map(e=>e.key));state.savedKeys=new Set([...state.savedKeys].filter(k=>valid.has(k)));renderPreference();renderResults(true)});
-window.KeySuiteV39442Dashboard={version:'4.17.04',runSelected,renderResults,renderPreference,loadPreference,masterSeries,seriesFor,brandSeriesFor,cancelPending,removeMaterialControls,presentationContext};
+window.KeySuiteV39442Dashboard={version:'4.21.01',runSelected,renderResults,renderPreference,loadPreference,masterSeries,seriesFor,brandSeriesFor,cancelPending,removeMaterialControls,presentationContext};
 window.KeySuiteV3944Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39444Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39445Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39446Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39447Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39449Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV394410Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV40201Dashboard=window.KeySuiteV39442Dashboard;
 let attempts=0;function boot(){attempts++;if(setup())return;if(attempts<40)setTimeout(boot,200)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

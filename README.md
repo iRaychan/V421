@@ -1,4 +1,4 @@
-# KeySuite V4.21 FULL CLEAN
+# KeySuite V4.21.01 FULL CLEAN
 
 Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
@@ -20,3 +20,7 @@ Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 - Fixed pricing continues to bypass margin, rarity factors, transport, discounts, fuel charge, and RM10 rounding.
 
 No SQL migration is required.
+
+
+## V4.21.01 CHC G1
+See `README_V42101.md` for the G1 hydraulic and V1.1 price-model changes.

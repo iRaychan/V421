@@ -4,7 +4,7 @@
   if (window.__KEYSUITE_V394410_MULTIBRAND__) return;
   window.__KEYSUITE_V394410_MULTIBRAND__=true;
 
-  const VERSION='4.18.11';
+  const VERSION='4.21.01';
   const $=id=>document.getElementById(id);
   const clone=v=>JSON.parse(JSON.stringify(v??{}));
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -852,8 +852,9 @@
     let chc=submenu.querySelector('button[data-v41222-selector-fallback="CHC"]')||submenu.querySelector(':scope > button[data-page="selector"]');
     let es=submenu.querySelector('button[data-v41222-selector-fallback="ES"]')||submenu.querySelector(':scope > button[data-page="selectorEs"]');
     const create=(page,family,label)=>{
-      const b=document.createElement('button');b.type='button';b.dataset.page=page;b.dataset.v41222SelectorFallback=family;b.textContent=label;
+      const b=document.createElement('button');b.type='button';b.dataset.page=page;b.dataset.v41222SelectorFallback=family;b.textContent=label;if(family==='CHC')b.dataset.generation='G2';
       b.addEventListener('click',()=>{
+        if(family==='CHC')window.KeySuiteCHCSelection?.setGeneration?.('G2');
         if(!window.KeySuiteApp?.showPage)return;
         clearSelectorPresentationContext(page);
         if(state.coreReady){
@@ -872,7 +873,7 @@
     if(!chc)chc=create('selector','CHC','CHC G2');
     if(!es)es=create('selectorEs','ES','ES');
     const master=masterBrand();
-    if(chc){chc.dataset.v41222SelectorFallback='CHC';chc.textContent=master?(brandSeriesFor(master,'CHC_G2')||'CHC G2'):'CHC G2';}
+    if(chc){chc.dataset.v41222SelectorFallback='CHC';chc.dataset.generation='G2';chc.textContent=master?(brandSeriesFor(master,'CHC_G2')||'CHC G2'):'CHC G2';}
     if(es){es.dataset.v41222SelectorFallback='ES';es.textContent=master?(brandSeriesFor(master,'ES')||'ES'):'ES';}
     return {chc,es};
   }
@@ -902,9 +903,6 @@
       .filter(f=>{
         const family=String(f.family||'').toUpperCase();
         if(!['CHC','ES'].includes(family))return false;
-        // V4.14.12.1: CHC G1 has no hydraulic curve dataset yet.
-        // Keep it in Product / Price List / Company Pricing, but never expose it in Selection.
-        if(family==='CHC'&&(String(f.generation||'').toUpperCase()==='G1'||normalizeProductGroup(f.productGroup)==='CHC_G1'))return false;
         if(!customerAllowsProduct(brand.id,f.productGroup||f.family,f.family))return false;
         return true;
       })
@@ -915,12 +913,16 @@
       families.forEach(f=>{
         const page=route(f.family),btn=document.createElement('button');
         btn.type='button';btn.className='v391-family-btn';
-        // V4.15.14: Selection visible name follows the saved Brand Series.
-        // CHC G1 remains excluded because it has no hydraulic curve yet.
+        // V4.21.01: Selection visible name follows the saved Brand Series.
+        // CHC G1 and G2 are independent hydraulic generations using the same Selection format.
         btn.textContent=brandSeriesFor(brand,f.productGroup||f.family)||productGroupLabel(f.productGroup||f.family)||String(f.family||'').toUpperCase();
         btn.dataset.brandId=brand.id;btn.dataset.family=f.family;btn.dataset.page=page;
-        if(String(state.selectedBrandId)===String(brand.id)&&String(state.selectedFamily)===String(f.family))btn.classList.add('active');
+        const selectorGeneration=String(f.generation||generationForGroup(f.productGroup||f.family)||'').toUpperCase();
+        if(f.family==='CHC'&&selectorGeneration)btn.dataset.generation=selectorGeneration;
+        const selectedGroup=normalizeProductGroup(state.selectedProductGroup||state.selectedFamily),buttonGroup=normalizeProductGroup(f.productGroup||f.family);
+        if(String(state.selectedBrandId)===String(brand.id)&&String(state.selectedFamily)===String(f.family)&&selectedGroup===buttonGroup)btn.classList.add('active');
         btn.onclick=()=>{
+          if(f.family==='CHC'&&selectorGeneration)window.KeySuiteCHCSelection?.setGeneration?.(selectorGeneration);
           const selected=setSelectedBrand(brand.id,f.family,page,f.productGroup||f.family);
           if(!selected&&!brandSeriesLocked()){
             const master=masterBrand();if(master)setSelectedBrand(master.id,f.family,page);
