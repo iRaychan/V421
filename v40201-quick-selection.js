@@ -1,4 +1,4 @@
-/* KeySuite V4.21.02 — Quick Pump Selection account-scope + customer Price-gated Brand / Series.
+/* KeySuite V4.21.03 — Dashboard Brand / Series follows User Assigned when no customer, and User Assigned × Customer Price Preference when selected.
    Preserves the user-entered Quick Selection flow/head units into the selected-model view and PDF.
    Hydraulic selection remains in m³/hr and metres. */
 (() => {
@@ -79,11 +79,13 @@ function noHydraulicStatus(brandId){
 const customerPrefApi=()=>window.KeySuiteV40001CustomerBrandSettings||window.KeySuiteV3964CustomerBrandSettings||null;
 function customerPriceScope(){
   const pref=customerPrefApi(),cid=String(pref?.currentDashboardCustomerId?.()||$('startCustomer')?.value||'');
-  if(!pref)return {cid:'',ready:false,entries:[],error:''};
   if(!cid){
     state.customerPriceError='';state.customerPriceErrorCid='';
-    return {cid:'',ready:true,entries:[],error:''};
+    // V4.21.03: no Dashboard customer means Quick Selection follows the signed-in user's
+    // Role Brand Assigned scope only. Do not require a customer Price Preference.
+    return {cid:'',ready:true,entries:entries(),error:''};
   }
+  if(!pref)return {cid,ready:false,entries:[],error:''};
 
   // Customer changed: discard an error belonging to the previous customer.
   if(state.customerPriceErrorCid&&state.customerPriceErrorCid!==cid){
@@ -210,7 +212,7 @@ function syncChecks(){
   state.savedKeys=new Set([...next].filter(k=>valid.has(String(k))));
 }
 
-function ensureUi(){const box=$('ksDashboardDutyFinder');if(!box)return false;if(!canQuick()){box.style.display='none';return true}box.style.display='';removeMaterialControls();$('ks405QuickEnhanced')?.remove();$('ks405QuickEnhancedLocked')?.remove();let d=$('ks39442Pref');if(!d){d=document.createElement('details');d.id='ks39442Pref';d.className='ks39442-pref';d.open=false;d.dataset.ksInitialCollapsed='1';d.innerHTML='<summary>Brand / Series Settings</summary><div class="ks39442-pref-body"><div class="muted" style="font-size:11px;margin:2px 0 8px">Only Brand / Series with Price ticked for the selected customer are shown here. From those Price-enabled choices, select which ones Quick Selection should search. Role / Owner authorization still applies.</div><div class="ks39442-pref-actions"><button class="btn secondary" type="button" id="ks39442All">Select All Allowed</button><button class="btn secondary" type="button" id="ks39442None">Clear All</button><button class="btn" type="button" id="ks39442Save">Save Preference</button></div><div id="ks39442PrefGrid" class="ks39442-pref-grid"></div></div>';const actions=box.querySelector('.ks-duty-actions');box.insertBefore(d,actions||box.firstChild);$('ks39442All').onclick=()=>d.querySelectorAll('input[data-pref-key]').forEach(x=>x.checked=true);$('ks39442None').onclick=()=>d.querySelectorAll('input[data-pref-key]').forEach(x=>x.checked=false);$('ks39442Save').onclick=savePreference}
+function ensureUi(){const box=$('ksDashboardDutyFinder');if(!box)return false;if(!canQuick()){box.style.display='none';return true}box.style.display='';removeMaterialControls();$('ks405QuickEnhanced')?.remove();$('ks405QuickEnhancedLocked')?.remove();let d=$('ks39442Pref');if(!d){d=document.createElement('details');d.id='ks39442Pref';d.className='ks39442-pref';d.open=false;d.dataset.ksInitialCollapsed='1';d.innerHTML='<summary>Brand / Series Settings</summary><div class="ks39442-pref-body"><div id="ks39442PrefHint" class="muted" style="font-size:11px;margin:2px 0 8px">No customer selected: showing only Brand / Series assigned to this user.</div><div class="ks39442-pref-actions"><button class="btn secondary" type="button" id="ks39442All">Select All Allowed</button><button class="btn secondary" type="button" id="ks39442None">Clear All</button><button class="btn" type="button" id="ks39442Save">Save Preference</button></div><div id="ks39442PrefGrid" class="ks39442-pref-grid"></div></div>';const actions=box.querySelector('.ks-duty-actions');box.insertBefore(d,actions||box.firstChild);$('ks39442All').onclick=()=>d.querySelectorAll('input[data-pref-key]').forEach(x=>x.checked=true);$('ks39442None').onclick=()=>d.querySelectorAll('input[data-pref-key]').forEach(x=>x.checked=false);$('ks39442Save').onclick=savePreference}
 if(!d.dataset.ksInitialCollapsed){d.open=false;d.dataset.ksInitialCollapsed='1'}d.style.display='';
 let r=$('ksV39442Results');if(!r){r=document.createElement('div');r.id='ksV39442Results';box.appendChild(r)}return true}
 function renderBrandState(){if(!ensureUi())return;const grid=$('ks39442PrefGrid');if(!grid)return;const a=api(),error=norm(a?.state?.coreError);grid.innerHTML=`<div class="ks39444-brand-state ${error?'error':''}"><b>${error?'Brand data unavailable':'Loading Brand / Series settings…'}</b><div class="muted" style="margin-top:4px">${esc(error||'Waiting for secure Brand data.')}</div>${error?'<button class="btn secondary" type="button" id="ks39444RetryQuickBrands">Retry</button>':''}</div>`;$('ks39444RetryQuickBrands')?.addEventListener('click',async()=>{const btn=$('ks39444RetryQuickBrands');if(btn){btn.disabled=true;btn.textContent='Loading…'}await a?.loadData?.({force:true});if(api()?.state?.coreReady)loadPreference();else renderBrandState()})}
@@ -229,10 +231,10 @@ function renderPreference(){
     return;
   }
   const scope=customerPriceScope();
-  if(!scope.cid){
-    grid.innerHTML='<div class="ks39444-brand-state"><b>Select a customer first.</b><div class="muted" style="margin-top:4px">Quick Selection only shows Brand / Series whose Price is ticked for the selected customer under Key → Customer.</div></div>';
-    return;
-  }
+  const hint=$('ks39442PrefHint');
+  if(hint)hint.textContent=scope.cid
+    ? 'Customer selected: showing only the intersection of User Assigned and Customer Brand / Series Price Preference.'
+    : 'No customer selected: showing only Brand / Series assigned to this user.';
   if(scope.error){
     grid.innerHTML=`<div class="ks39444-brand-state error"><b>Customer Price Preference could not be loaded.</b><div class="muted" style="margin-top:4px">${esc(scope.error)}</div><button class="btn secondary" type="button" id="ks41704RetryCustomerPrice">Retry</button></div>`;
     $('ks41704RetryCustomerPrice')?.addEventListener('click',async()=>{
@@ -258,14 +260,16 @@ function renderPreference(){
   }
   const all=scope.entries,visible=roleVisible.filter(b=>all.some(e=>String(e.brand.id)===String(b.id)));
   if(!all.length){
-    grid.innerHTML='<div class="ks39444-brand-state"><b>No Brand / Series Price is enabled for this customer.</b><div class="muted" style="margin-top:4px">Tick Price for the required Brand / Series under Key → Customer. Unticked series stay hidden from Quick Selection.</div></div>';
+    grid.innerHTML=scope.cid
+      ? '<div class="ks39444-brand-state"><b>No Brand / Series Price is enabled for this customer.</b><div class="muted" style="margin-top:4px">Tick Price for the required Brand / Series under Key → Customer. Unticked series stay hidden from Quick Selection.</div></div>'
+      : '<div class="ks39444-brand-state"><b>No Brand / Series is assigned to this user.</b><div class="muted" style="margin-top:4px">Ask the Owner to assign the required Brand / Series under Key → Role → Brand Assigned.</div></div>';
     return;
   }
   const enhancedAnchor=((all.find(e=>e.family==='CHC'&&normalizeGroup(e.productGroup)==='CHC_G2'&&isMaster(e.brand))||all.find(e=>e.family==='CHC'&&normalizeGroup(e.productGroup)==='CHC_G2'))?.key||'');
   visible.forEach(b=>{
     const mine=all.filter(e=>String(e.brand.id)===String(b.id)),card=document.createElement('div');
     card.className='ks39442-pref-brand';
-    card.innerHTML=`<b>${esc(b.brand_name)}</b><span class="ks41501-role-authorized">Price Enabled</span>`;
+    card.innerHTML=`<b>${esc(b.brand_name)}</b><span class="ks41501-role-authorized">${scope.cid?'User + Customer':'User Assigned'}</span>`;
     mine.forEach(e=>{
       const row=document.createElement('div');row.className='ks39442-check';
       const familyLabel=document.createElement('label');familyLabel.className='ks39442-check-label';
@@ -357,7 +361,7 @@ window.addEventListener('KEYSUITE_CUSTOMER_BRAND_PREFERENCE_CHANGED',event=>{
 });
 window.addEventListener('KEYSUITE_BRANDS_ERROR',()=>{state.prefLoaded=false;renderBrandState()});
 window.addEventListener('KEYSUITE_V393_BRAND_CONTEXT_CHANGED',()=>{if(!api()?.state?.coreReady)return;if(!state.prefLoaded){loadPreference();return}const valid=new Set(entries().map(e=>e.key));state.savedKeys=new Set([...state.savedKeys].filter(k=>valid.has(k)));renderPreference();renderResults(true)});
-window.KeySuiteV39442Dashboard={version:'4.21.02',runSelected,renderResults,renderPreference,loadPreference,masterSeries,seriesFor,brandSeriesFor,cancelPending,removeMaterialControls,presentationContext};
+window.KeySuiteV39442Dashboard={version:'4.21.03',runSelected,renderResults,renderPreference,loadPreference,masterSeries,seriesFor,brandSeriesFor,cancelPending,removeMaterialControls,presentationContext};
 window.KeySuiteV3944Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39444Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39445Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39446Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39447Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39449Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV394410Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV40201Dashboard=window.KeySuiteV39442Dashboard;
 let attempts=0;function boot(){attempts++;if(setup())return;if(attempts<40)setTimeout(boot,200)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
