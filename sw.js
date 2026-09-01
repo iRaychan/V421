@@ -1,5 +1,5 @@
 /* KeySuite V4.21.02 Service Worker. */
-const CACHE='keysuite-v42104';
+const CACHE='keysuite-v42105';
 const BOOTSTRAP='<script src="./v41200-bootstrap.js?v=41906"></script>';
 const SHELL=[
   './','./index.html','./manifest.json','./keylargo-logo.png',

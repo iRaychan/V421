@@ -1,15 +1,38 @@
-# KeySuite V4.21.03 Upgrade
+# KeySuite V4.21.05 FULL CLEAN
 
-Upgrade target: V4.21.02.
+Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
-Changes:
-- Dashboard -> Brand / Series Settings no longer requires a customer.
-- No customer selected: show User Assigned only.
-- Customer selected: show User Assigned x Customer Brand / Series Price Preference only.
-- Quick Selection execution uses the same rule, not only the visible settings panel.
-- Runtime cache version updated so browsers load the patched Quick Selection logic immediately.
+## CHC impeller adjustment
 
-Deployment:
-1. Replace/upload the files in this upgrade package.
-2. No `supabase db push` is required.
-3. No Edge Function deployment is required.
+- Custom reduced/small impeller counts now use the visible CHC suffix instead of `(Custom)`.
+- Example: CHC 32-30 with 3 small/reduced impellers displays as `CHC 32-30-3`.
+- Example: CHC 32-80 with 5 small/reduced impellers displays as `CHC 32-80-5`.
+- Pricing remains tied to a valid catalog SKU. When the custom reduced count is beyond the catalog range, pricing uses the closest available reduced-impeller SKU for the same base model.
+- Therefore CHC 32-30-3 prices from CHC 32-30-2, and CHC 32-80-5 prices from CHC 32-80-2.
+- Existing exact catalog impeller models continue to use their exact model name and price.
+- Existing physical `Reduce Impeller` stage-removal behavior remains unchanged.
+
+## V4.20.01 pricing correction retained
+
+- Fixed Price remains global/customer-independent.
+- Fixed rows are resolved before customer Pricing Category currency filters.
+- Fixed pricing does not require USD/RMB/MYR to be selected.
+- Fixed pricing continues to bypass margin, rarity factors, transport, discounts, fuel charge, and RM10 rounding.
+
+No SQL migration is required.
+
+
+## V4.21.02 CHC G1
+See `README_V42102.md` for the G1 hydraulic and V1.1 price-model changes.
+
+
+## V4.21.03 Dashboard Brand / Series
+See `README_V42103.md` for the Dashboard no-customer User Assigned behavior and customer intersection rule.
+
+
+## V4.21.04 Brand checkbox + C4 Enhanced
+See `README_V42104.md` for Brand-level select-all behavior and C4 Enhanced availability/default.
+
+
+## V4.21.05 C4/G1 PDF dimensions
+See `README_V42105.md` for the corrected C4/G1 dimension drawings and G1 numeric dimension table used by PDF export.
