@@ -912,7 +912,7 @@ function exportPDF(requestedFilename){
  if(!best)return;
  let resolvedFilename=requestedFilename;
  if(!resolvedFilename&&window.parent&&window.parent!==window){try{const api=window.parent.KeySuitePumpPdfNames,payload=window.__KEYSUITE_CURRENT_SELECTION?.();if(api&&typeof api.nextFromPayload==='function'&&payload)resolvedFilename=api.nextFromPayload(payload)}catch(_){}}
- const pdfFileTitleRaw=String(resolvedFilename||best.model||'Pump Model').trim();
+ const pdfFileTitleRaw=String(resolvedFilename||best.model||'Pump Model').trim().replace(/\bCHCN\b/gi,'CHC');
  const pdfFileTitle=/\.pdf$/i.test(pdfFileTitleRaw)?pdfFileTitleRaw:(pdfFileTitleRaw+'.pdf');
  const {q,h}=selectionState;
  const enhanced=!!selectionState.enhanced;

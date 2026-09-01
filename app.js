@@ -995,7 +995,7 @@ function pumpPayloadCoupling(pump={}){
 }
 function pumpPdfFilenameFromPayload(pump={},itemNumber=1){
  const rawModel=pump.quotation_model||pump.display_model||pump.model||pump.pumpData?.model||'Pump Model';
- const model=stripQuotationBrand(String(rawModel)).trim();
+ const model=stripQuotationBrand(String(rawModel)).trim().replace(/\bCHCN\b/gi,'CHC');
  const isEs=isEsSelectionPayload(pump),bare=!!(pump.keysuite_bare_shaft||pump.export_state?.bareShaft||String(pump.keysuite_supply_mode||'').toUpperCase()==='BARE');
  const hp=Number(pump.motor_hp??pump.pumpData?.motorHp),pole=Number(pump.pole),efficiency=String(pump.motor_efficiency_class??pump.pumpData?.motorEfficiencyClass??pump.export_state?.motorEfficiencyClass??'').trim().toUpperCase();
  const motorBits=[];
@@ -1008,7 +1008,7 @@ function pumpPdfFilenameFromPayload(pump={},itemNumber=1){
 function quotePumpPdfFilename(row,itemNumber){
  let pump={};try{pump=JSON.parse(row?.dataset?.pumpData||'{}')}catch(_){}
  const rawModel=splitCapacityModel(row?.querySelector('.item-model')?.value||'').base||pump.quotation_model||pump.display_model||pump.model||'Pump Model';
- const model=stripQuotationBrand(rawModel).trim();
+ const model=stripQuotationBrand(rawModel).trim().replace(/\bCHCN\b/gi,'CHC');
  const isEs=isEsSelectionPayload(pump),bare=!!(pump.keysuite_bare_shaft||pump.export_state?.bareShaft||String(pump.keysuite_supply_mode||'').toUpperCase()==='BARE');
  const description=String(row?.querySelector('.item-description')?.value||'');
  const motorMatch=description.match(/\bc\/?w\s+([0-9]+(?:\.[0-9]+)?)\s*HP\s+([2468])\s*(?:P|Pole)\s+(IE\d)\b/i);
