@@ -1,4 +1,4 @@
-# KeySuite V4.21.11 UPGRADE
+# KeySuite V4.21.12 UPGRADE
 
 Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
@@ -57,3 +57,6 @@ See `README_V42109.md` for the CHC G1/G2 admin Price Group and C4/C6 user-facing
 
 ## V4.21.11
 Rebuilt from V4.21.10. Cache token is `42111`. Deploy `telegram-webhook`; no database push is required.
+
+## V4.21.12
+KeyBot / Telegram CHC C4 PDF Page 3 now uses the correct G1 dimension drawing assets. C6/G2 is unchanged. No database push is required; redeploy `telegram-webhook`.

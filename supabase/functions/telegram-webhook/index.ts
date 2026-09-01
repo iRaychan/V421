@@ -2002,7 +2002,7 @@ Deno.serve(async(req)=>{
     if(menuText||callbackData==='menu:home'){
       session=await saveKeybotSession(service,keySuiteCompanyId,chatId,senderId,{mode:'',step:'idle',flow_m3h:null,head_m:null,flow_raw:null,head_raw:null,selected_customer_id:null,context:{}});
       await telegramSend(telegramToken,chatId,`Hi 👋\n\n${simpleRequestMenuText()}`,mainMenuMarkup());
-      return json({ok:true,status:'keybot_menu',version:'V4.21.11'});
+      return json({ok:true,status:'keybot_menu',version:'V4.21.12'});
     }
     if(newRequestButton){
       session=await saveKeybotSession(service,keySuiteCompanyId,chatId,senderId,{mode:'',step:'idle',flow_m3h:null,head_m:null,flow_raw:null,head_raw:null,selected_customer_id:null,context:{}});

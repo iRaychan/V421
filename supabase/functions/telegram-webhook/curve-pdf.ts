@@ -7,6 +7,7 @@ import '../shared-chc/chc-selector-core.js';
 import { CHC_DIMENSIONS } from './chc-dimensions.ts';
 import { CHC_G1_DIMENSIONS } from './chc-g1-dimensions.ts';
 import { REPORT_LOGO_BASE64, ES_DIMENSION_BASE64, CHC_DIMENSION_BASE64 } from './report-assets.ts';
+import { CHC_G1_DIMENSION_BASE64 } from './chc-g1-dimension-assets.ts';
 import './es-core.js';
 import './es-data.js';
 import './motor-data.js';
@@ -21,6 +22,28 @@ const MB:any=(globalThis as any).KeySuiteMotorBaseplateV40205;
 if(!CHC_DB||!CHC_CORE||!CHC_G1_DB||!CHC_G1_CORE)throw new Error('KeySuite CHC C4/C6 selector core/data unavailable.');
 function isChcFamily(fam:any){const f=String(fam||'').toUpperCase();return f==='CHC'||f==='CHC_G1'||f==='CHC_G2'}
 function chcEngine(fam:any){const f=String(fam||'').toUpperCase();return f==='CHC_G1'?{db:CHC_G1_DB,core:CHC_G1_CORE,generation:'G1',label:'CHC C4',motorEff:'IE2'}:{db:CHC_DB,core:CHC_CORE,generation:'G2',label:'CHC C6',motorEff:'IE3'}}
+
+function chcG1DimensionVariant(material:any){
+  const raw=String(material||'SS304 (Cast Iron Connection)').trim().toUpperCase().replace(/\s+/g,' ');
+  if(/SS\s*316/.test(raw))return 'CHCN';
+  if(/SS\s*304/.test(raw)&&!/(?:CAST\s*IRON|\bCI\b).*CONNECTION/.test(raw))return 'CHCS';
+  return 'CHC';
+}
+function chcG1DimensionImageKey(series:any,material:any){
+  const match=String(series||'').match(/CHC\s*(\d+)/i),family=match?Number(match[1]):0,variant=chcG1DimensionVariant(material);
+  if([1,2,3,4,5].includes(family))return variant==='CHC'?'1':'2';
+  if([8,10].includes(family))return variant==='CHC'?'3':'4';
+  if(family===12)return '5';
+  if([15,16,20].includes(family))return variant==='CHC'?'6':'7';
+  if(family===32)return '8';
+  if(family===45)return '9';
+  if(family===64)return '10';
+  if(family===90)return '11';
+  if([120,150].includes(family))return '12';
+  if(family===200)return '13';
+  return '';
+}
+
 
 type XY={x:number,y:number};
 type ChartSpec={
@@ -511,7 +534,14 @@ export async function generateCurvePdf(family:string,q:number,h:number,dutyText:
   let dimImage:any=null;
   if(isChc){
     const series=String((selectChc(q,h,forcedModel,fam) as any)?.series||'');
-    const b64=(CHC_DIMENSION_BASE64 as any)[series];if(b64)dimImage=await pdf.embedPng(b64bytes(b64));
+    let b64='';
+    if(engine?.generation==='G1'){
+      const key=chcG1DimensionImageKey(series,displayIdentity?.material);
+      b64=key?String((CHC_G1_DIMENSION_BASE64 as any)[key]||''):'';
+    }else{
+      b64=String((CHC_DIMENSION_BASE64 as any)[series]||'');
+    }
+    if(b64)dimImage=await pdf.embedPng(b64bytes(b64));
   }else dimImage=await pdf.embedPng(b64bytes(ES_DIMENSION_BASE64));
 
   const mt=motorTech(motorHp,pole,isChc?String(engine?.motorEff||'IE3'):'IE3');
