@@ -7,7 +7,6 @@ import '../shared-chc/chc-selector-core.js';
 import { CHC_DIMENSIONS } from './chc-dimensions.ts';
 import { CHC_G1_DIMENSIONS } from './chc-g1-dimensions.ts';
 import { REPORT_LOGO_BASE64, ES_DIMENSION_BASE64, CHC_DIMENSION_BASE64 } from './report-assets.ts';
-import { CHC_G1_DIMENSION_BASE64 } from './chc-g1-dimension-assets.ts';
 import './es-core.js';
 import './es-data.js';
 import './motor-data.js';
@@ -66,6 +65,27 @@ const BLUE=rgb(0.04,0.38,0.64), DARK=rgb(0.08,0.22,0.31), GRID=rgb(0.85,0.90,0.9
 const RED=rgb(0.85,0.13,0.12), GREEN=rgb(0.02,0.50,0.33), PINK=rgb(0.90,0.68,0.69);
 
 function b64bytes(s:string){const bin=atob(s),out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
+const KEYCHC_PUBLIC_BASE_FALLBACK='https://iraychan.github.io/KeySuite';
+function publicAssetBases(baseUrl:any){
+  const out:string[]=[];
+  const add=(value:any)=>{const clean=String(value||'').trim().replace(/\/+$/,'');if(clean&&!out.includes(clean))out.push(clean)};
+  add(baseUrl);add(KEYCHC_PUBLIC_BASE_FALLBACK);add('https://raw.githubusercontent.com/iRaychan/KeySuite/main');
+  return out;
+}
+async function embedPublicPng(pdf:any,baseUrl:any,relativePath:string){
+  const cleanPath=String(relativePath||'').replace(/^\/+/,''),errors:string[]=[];
+  for(const base of publicAssetBases(baseUrl)){
+    const url=`${base}/${cleanPath}${cleanPath.includes('?')?'&':'?'}v=42113`;
+    try{
+      const response=await fetch(url,{headers:{'Accept':'image/png'}});
+      if(!response.ok){errors.push(`${response.status} ${url}`);continue}
+      const bytes=new Uint8Array(await response.arrayBuffer());
+      if(bytes.length<8||bytes[0]!==0x89||bytes[1]!==0x50||bytes[2]!==0x4e||bytes[3]!==0x47){errors.push(`Not PNG ${url}`);continue}
+      return await pdf.embedPng(bytes);
+    }catch(error){errors.push(`${error instanceof Error?error.message:String(error)} ${url}`)}
+  }
+  throw new Error(`CHC C4 dimension drawing could not be loaded (${cleanPath}). ${errors.join(' | ')}`);
+}
 function reportLogoPayload(value:any){
   const raw=String(value||'').trim();
   if(!raw)return null;
@@ -468,7 +488,7 @@ export function selectPumpCandidates(family:string,q:number,h:number,esPole=0,li
   return [];
 }
 
-export async function generateCurvePdf(family:string,q:number,h:number,dutyText:string,_baseUrl:string,esPole=0,forcedModel:string='',displayIdentity:any=null){
+export async function generateCurvePdf(family:string,q:number,h:number,dutyText:string,baseUrl:string,esPole=0,forcedModel:string='',displayIdentity:any=null){
   const fam=String(family||'').toUpperCase(),isChc=isChcFamily(fam),engine=isChc?chcEngine(fam):null;
   let model='',motorKw=0,motorHp=0,eff=0,npsh=0,selectionShaft=0,dutyBrakeHp=0,rpm=0,pole=2,hz=50;
   let suction='-',discharge='-',stages=0,impellerMm=0,maxPressure=0,dim:any={},esPs:any=null;
@@ -537,11 +557,11 @@ export async function generateCurvePdf(family:string,q:number,h:number,dutyText:
     let b64='';
     if(engine?.generation==='G1'){
       const key=chcG1DimensionImageKey(series,displayIdentity?.material);
-      b64=key?String((CHC_G1_DIMENSION_BASE64 as any)[key]||''):'';
+      if(key)dimImage=await embedPublicPng(pdf,baseUrl,`assets/chc-g1-dimensions/${key}.png`);
     }else{
       b64=String((CHC_DIMENSION_BASE64 as any)[series]||'');
+      if(b64)dimImage=await pdf.embedPng(b64bytes(b64));
     }
-    if(b64)dimImage=await pdf.embedPng(b64bytes(b64));
   }else dimImage=await pdf.embedPng(b64bytes(ES_DIMENSION_BASE64));
 
   const mt=motorTech(motorHp,pole,isChc?String(engine?.motorEff||'IE3'):'IE3');

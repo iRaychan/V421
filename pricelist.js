@@ -230,7 +230,7 @@
     const body=el('keyplcPriceRows');if(!body)return;
     const search=String(el('keyplcPriceSearch')?.value||'').trim().toLowerCase();
     const currency=currentCurrency('keyplc'),field=keyplcPriceField(currency);
-    const rows=keyplcProducts().filter(product=>!search||String(product.model||'').toLowerCase().includes(search));
+    const rows=keyplcProducts().filter(product=>!search||String(product.model||'').toLowerCase().includes(search)).sort((a,b)=>Number(a.motorKw||String(a.model||'').replace(/[^0-9.]/g,'')||0)-Number(b.motorKw||String(b.model||'').replace(/[^0-9.]/g,'')||0));
     body.innerHTML=rows.map(product=>{
       const variants=product.variants||[];
       const cells=Array.from({length:6},(_,index)=>{const qty=index+1,variant=variants.find(v=>Number(v.pumpQty||v.pump_qty||String(v.label||'').match(/\d+/)?.[0]||0)===qty),value=variant?.[field];return `<td><div class="currency-price-input"><span>${esc(currency)}</span><input type="number" min="0" step="0.01" value="${esc(value===null||value===''||!Number.isFinite(Number(value))?'':Number(value).toFixed(2))}" data-keyplc-price="${esc(product.id)}" data-keyplc-pump="${qty}" aria-label="${esc(product.model)} ${qty} pump ${esc(currency)} price"></div></td>`}).join('');
