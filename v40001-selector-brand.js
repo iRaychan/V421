@@ -290,7 +290,7 @@
     // This prevents later navigation/material/brand events from reverting TESK/OEM output.
     try{
       const locked=sourceWin?.__KEYSUITE_PDF_PRESENTATION_SNAPSHOT;
-      if(locked&&typeof locked==='object')return {...locked};
+      if(locked&&typeof locked==='object')return {...locked,pdfFileTitle:String(sourceWin?.__KEYSUITE_PDF_FILE_TITLE__||locked.pdfFileTitle||'')};
     }catch(_){}
     const family=String(sourceWin?.__KEYSUITE_V39445_FAMILY||'CHC').toUpperCase();
     const ctx=context(family,sourceWin);
@@ -306,6 +306,7 @@
       masterSeries:String(ctx?.masterSeries||family),
       masterModel:String(ctx?.masterModel||''),
       displayModel:String(ctx?.displayModel||''),
+      pdfFileTitle:String(sourceWin?.__KEYSUITE_PDF_FILE_TITLE__||''),
       material:liveMaterial(family,sourceWin)||String(ctx?.material||''),
       seal:norm(sourceWin?.keysuiteExportPayload?.keysuite_seal)||'Car/Cer',
       elastomer:norm(sourceWin?.keysuiteExportPayload?.keysuite_elastomer)||'Viton',

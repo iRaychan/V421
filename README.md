@@ -1,4 +1,4 @@
-# KeySuite V4.21.05 FULL CLEAN
+# KeySuite V4.21.07 FULL CLEAN
 
 Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
@@ -36,3 +36,7 @@ See `README_V42104.md` for Brand-level select-all behavior and C4 Enhanced avail
 
 ## V4.21.05 C4/G1 PDF dimensions
 See `README_V42105.md` for the corrected C4/G1 dimension drawings and G1 numeric dimension table used by PDF export.
+
+
+## V4.21.07
+See `README_V42107.md` for the PDF metadata, Quick Selection first-click, Dashboard Item reset and PDC changes.

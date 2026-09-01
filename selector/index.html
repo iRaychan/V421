@@ -914,6 +914,7 @@ function exportPDF(requestedFilename){
  if(!resolvedFilename&&window.parent&&window.parent!==window){try{const api=window.parent.KeySuitePumpPdfNames,payload=window.__KEYSUITE_CURRENT_SELECTION?.();if(api&&typeof api.nextFromPayload==='function'&&payload)resolvedFilename=api.nextFromPayload(payload)}catch(_){}}
  const pdfFileTitleRaw=String(resolvedFilename||best.model||'Pump Model').trim().replace(/\bCHCN\b/gi,'CHC');
  const pdfFileTitle=/\.pdf$/i.test(pdfFileTitleRaw)?pdfFileTitleRaw:(pdfFileTitleRaw+'.pdf');
+ window.__KEYSUITE_PDF_FILE_TITLE__=pdfFileTitle;try{window.__KEYSUITE_PDF_PRESENTATION_SNAPSHOT={...(window.__KEYSUITE_PDF_PRESENTATION_SNAPSHOT||{}),pdfFileTitle};}catch(_){}
  const {q,h}=selectionState;
  const enhanced=!!selectionState.enhanced;
  const hz=enhanced?KEYSUITE_ENHANCED_MAX_HZ:keychcCurveHz(),pumpQ=q;
@@ -1628,7 +1629,7 @@ alternatives.innerHTML='';
    const quick=msg.quickSelection===true,rawFlow=quick&&Number.isFinite(Number(msg.rawFlow))?Number(msg.rawFlow):Number(msg.flowM3h||0),rawHead=quick&&Number.isFinite(Number(msg.rawHead))?Number(msg.rawHead):Number(msg.headM||0),rawFlowText=quick&&msg.rawFlowText!=null?String(msg.rawFlowText):String(rawFlow),rawHeadText=quick&&msg.rawHeadText!=null?String(msg.rawHeadText):String(rawHead);
    flowInput.value=rawFlowText;headInput.value=rawHeadText;flowUnitInput.value=quick&&msg.flowUnit?msg.flowUnit:'m3h';headUnitInput.value=quick&&msg.headUnit?msg.headUnit:'m';
    if(enhancedMode)enhancedMode.checked=enhanced;updateEnhancedModeUI();speedUnit.value='hz';speedInput.value=enhanced?String(KEYSUITE_ENHANCED_MAX_HZ):'50';if(enhanced)hzHidden.value=String(KEYSUITE_ENHANCED_MAX_HZ);else updateSpeedConversion();run();if(selectionState?.models?.length){selectionState.quickSelection=quick;renderSelected();}
-   if(msg.type==='KEYSUITE_DASHBOARD_OPEN_MODEL'&&msg.model){const wanted=String(msg.model).toLowerCase();let idx=selectionState.models.findIndex(x=>String(x.model).toLowerCase()===wanted);if(idx<0){const wm=DB.models.find(x=>String(x.model).toLowerCase()===wanted),alt=wm&&keychcAlternativeMaxCandidate(wm);if(alt){selectionState.models.push(alt);idx=selectionState.models.length-1}}if(idx>=0){selectionState.selectedIndex=idx;renderAlternatives();renderSelected();}}
+   if(msg.type==='KEYSUITE_DASHBOARD_OPEN_MODEL'){let opened=false;if(msg.model){const wanted=String(msg.model).toLowerCase();let idx=selectionState.models.findIndex(x=>String(x.model).toLowerCase()===wanted);if(idx<0){const wm=DB.models.find(x=>String(x.model).toLowerCase()===wanted),alt=wm&&keychcAlternativeMaxCandidate(wm);if(alt){selectionState.models.push(alt);idx=selectionState.models.length-1}}if(idx>=0){selectionState.selectedIndex=idx;renderAlternatives();renderSelected();opened=true;}}window.parent?.postMessage({type:'KEYSUITE_DASHBOARD_MODEL_OPENED',requestId:msg.requestId,family:'CHC',model:String(msg.model||''),opened},'*');}
    if(msg.type==='KEYSUITE_DASHBOARD_SELECT'){const data=currentSelection();if(data)data.alternatives=keychcDashboardAlternatives();window.parent?.postMessage({type:'KEYSUITE_DASHBOARD_RESULT',requestId:msg.requestId,family:'CHC',suitable:!!data,data},'*');}return;
   }
   if(msg.type==='KEYSUITE_PRODUCT_DUTY'){if(productFrame)applyProductDuty(msg.flowM3h,msg.headM,{flowUnit:'m3h',headUnit:'m'});return;}

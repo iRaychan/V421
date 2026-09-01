@@ -335,26 +335,36 @@ function pinFrameContext(fr,ctx){
   return false;
 }
 async function openCurve(e,data){
-  const req=state.pending;if(!req||!data)return;const page=e.family==='ES'?'selectorEs':'selector';
+  const req=state.pending;if(!req||!data)return;const page=e.family==='ES'?'selectorEs':'selector',family=upper(e.family),wantedModel=String(data.model||'');
   try{api()?.setSelectedBrand?.(e.brand.id,e.family,page,e.productGroup||e.family)}catch(_){}
   if(e.family==='CHC'){window.KeySuiteCHCSelection?.setGeneration?.(chcGeneration(e));const mat=$('pumpMaterial');if(mat){mat.value=DEFAULT_CHC_MATERIAL;mat.dispatchEvent(new Event('change',{bubbles:true}))}}
-  const fr=ensureFrame(e),ready=await waitFrameReady(e,req.requestId);if(!ready)return;
-  if(e.family==='CHC')setDefaultChcPayload(fr);
-  const ctx=presentationContext(e,data);pinFrameContext(fr,ctx);
-  try{window.KeySuiteSelectorBrand?.collapseSummaryForFrame?.(fr)}catch(_){}
+  const ctx=presentationContext(e,data);
   try{window.KeySuiteModelReturn?.markQuickSelection?.(e.family)}catch(_){}
   window.__KEYSUITE_PRESERVE_SELECTOR_BRAND_ONCE__={page,family:e.family,brandId:String(e.brand.id),context:ctx};
-  window.__KEYSUITE_QUICK_SELECTION_OPENING__={family:e.family,expires:Date.now()+3000};
+  window.__KEYSUITE_QUICK_SELECTION_OPENING__={family:e.family,expires:Date.now()+5000};
   if(window.KeySuiteApp?.showPage)window.KeySuiteApp.showPage(page);else{const nav=document.querySelector(`button[data-page="${page}"]`);if(nav)nav.click();}
-  setTimeout(()=>{if(window.__KEYSUITE_QUICK_SELECTION_OPENING__?.family===e.family)delete window.__KEYSUITE_QUICK_SELECTION_OPENING__},3000);
-  setTimeout(()=>{
-    if(state.pending?.requestId!==req.requestId)return;
-    try{if(window.__KEYSUITE_PRESERVE_SELECTOR_BRAND_ONCE__?.context===ctx)delete window.__KEYSUITE_PRESERVE_SELECTOR_BRAND_ONCE__}catch(_){}
-    try{api()?.setSelectedBrand?.(e.brand.id,e.family,page,e.productGroup||e.family)}catch(_){}
-    pinFrameContext(fr,ctx);if(e.family==='CHC')setDefaultChcPayload(fr);
-    sendOnce(e,{type:'KEYSUITE_DASHBOARD_OPEN_MODEL',requestId:req.requestId,flowM3h:req.flowM3h,headM:req.headM,rawFlow:req.rawFlow,rawHead:req.rawHead,rawFlowText:req.rawFlowText,rawHeadText:req.rawHeadText,flowUnit:req.flowUnit,headUnit:req.headUnit,quickSelection:true,enhanced:e.family==='CHC'&&!!data.enhanced,model:data.model||''});
-    setTimeout(()=>{if(state.pending?.requestId!==req.requestId)return;pinFrameContext(fr,ctx);try{window.KeySuiteSelectorBrand?.collapseSummaryForFrame?.(fr);window.KeySuiteSelectorBrand?.refresh?.(fr)}catch(_){}},100);
-  },0);
+  // V4.21.07: page navigation/brand refresh can reload the iframe. Refresh first, then
+  // wait for the final frame to be ready before sending the exact model request.
+  await new Promise(resolve=>setTimeout(resolve,40));
+  if(state.pending?.requestId!==req.requestId)return;
+  let fr=ensureFrame(e);
+  try{api()?.setSelectedBrand?.(e.brand.id,e.family,page,e.productGroup||e.family)}catch(_){}
+  pinFrameContext(fr,ctx);if(e.family==='CHC')setDefaultChcPayload(fr);
+  try{window.KeySuiteSelectorBrand?.collapseSummaryForFrame?.(fr);window.KeySuiteSelectorBrand?.refresh?.(fr)}catch(_){}
+  const ready=await waitFrameReady(e,req.requestId);if(!ready||state.pending?.requestId!==req.requestId)return;
+  fr=ensureFrame(e);pinFrameContext(fr,ctx);if(e.family==='CHC')setDefaultChcPayload(fr);
+  try{window.KeySuiteSelectorBrand?.collapseSummaryForFrame?.(fr)}catch(_){}
+
+  const payload={type:'KEYSUITE_DASHBOARD_OPEN_MODEL',requestId:req.requestId,flowM3h:req.flowM3h,headM:req.headM,rawFlow:req.rawFlow,rawHead:req.rawHead,rawFlowText:req.rawFlowText,rawHeadText:req.rawHeadText,flowUnit:req.flowUnit,headUnit:req.headUnit,quickSelection:true,enhanced:e.family==='CHC'&&!!data.enhanced,model:wantedModel};
+  await new Promise(resolve=>{
+    let done=false,attempt=0;const timers=[];
+    const finish=()=>{if(done)return;done=true;window.removeEventListener('message',onAck,true);timers.forEach(clearTimeout);resolve()};
+    const onAck=ev=>{const m=ev.data||{};if(m.type!=='KEYSUITE_DASHBOARD_MODEL_OPENED'||m.requestId!==req.requestId||upper(m.family)!==family)return;if(String(m.model||'').toLowerCase()!==wantedModel.toLowerCase())return;if(m.opened!==false)finish()};
+    const send=()=>{if(done||state.pending?.requestId!==req.requestId){finish();return}const live=ensureFrame(e);pinFrameContext(live,ctx);if(e.family==='CHC')setDefaultChcPayload(live);sendOnce(e,payload);attempt++;if(attempt<6)timers.push(setTimeout(send,[140,220,360,560,850][attempt-1]||850));else timers.push(setTimeout(finish,900))};
+    window.addEventListener('message',onAck,true);send();
+  });
+  try{if(window.__KEYSUITE_PRESERVE_SELECTOR_BRAND_ONCE__?.context===ctx)delete window.__KEYSUITE_PRESERVE_SELECTOR_BRAND_ONCE__}catch(_){}
+  if(window.__KEYSUITE_QUICK_SELECTION_OPENING__?.family===e.family)delete window.__KEYSUITE_QUICK_SELECTION_OPENING__;
 }
 
 function bind(){const box=$('ksDashboardDutyFinder');if(!box||box.dataset.v39444Bound)return false;box.dataset.v39444Bound='1';
@@ -377,7 +387,7 @@ window.addEventListener('KEYSUITE_CUSTOMER_BRAND_PREFERENCE_CHANGED',event=>{
 });
 window.addEventListener('KEYSUITE_BRANDS_ERROR',()=>{state.prefLoaded=false;renderBrandState()});
 window.addEventListener('KEYSUITE_V393_BRAND_CONTEXT_CHANGED',()=>{if(!api()?.state?.coreReady)return;if(!state.prefLoaded){loadPreference();return}const valid=new Set(entries().map(e=>e.key));state.savedKeys=new Set([...state.savedKeys].filter(k=>valid.has(k)));renderPreference();renderResults(true)});
-window.KeySuiteV39442Dashboard={version:'4.21.04',runSelected,renderResults,renderPreference,loadPreference,masterSeries,seriesFor,brandSeriesFor,cancelPending,removeMaterialControls,presentationContext};
+window.KeySuiteV39442Dashboard={version:'4.21.07',runSelected,renderResults,renderPreference,loadPreference,masterSeries,seriesFor,brandSeriesFor,cancelPending,removeMaterialControls,presentationContext};
 window.KeySuiteV3944Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39444Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39445Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39446Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39447Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39449Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV394410Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV40201Dashboard=window.KeySuiteV39442Dashboard;
 let attempts=0;function boot(){attempts++;if(setup())return;if(attempts<40)setTimeout(boot,200)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

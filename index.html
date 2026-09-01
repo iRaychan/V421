@@ -770,7 +770,8 @@ aside::-webkit-scrollbar{width:0;height:0;display:none}
               <div id="customerDistanceWrap"><label>Distance (km) · Admin only</label><input id="customerDistance" type="number" min="0" step="0.1" value="0"></div>
               <div><label>Company Phone</label><input id="companyPhone" placeholder="+60 (x) xxxx xxxx"></div>
               <div class="span-3"><label>Address</label><textarea id="address" style="min-height:110px"></textarea></div>
-              <div class="span-2"><label>Terms (days)</label><input id="customerTerms" type="number" min="0" step="1" inputmode="numeric" placeholder="Example: 60"></div>
+              <div><label>Terms (days)</label><input id="customerTerms" type="number" min="0" step="1" inputmode="numeric" placeholder="Example: 60"></div>
+              <div><label>PDC</label><label class="template-check" style="height:42px;align-items:center"><input id="customerPdc" type="checkbox"> 90 Days PDC</label></div>
               <div class="span-2"><label>Default Quotation Template</label><select id="customerDefaultQuotationTemplate"><option value="">Use company default template</option></select></div>
               <div><label>TIN Number</label><input id="tinNumber"></div>
               <div><label>Business Registration No.</label><input id="brnNumber"></div>
@@ -806,7 +807,7 @@ aside::-webkit-scrollbar{width:0;height:0;display:none}
         <div><label>Supply</label><label id="bareShaftControl" class="default-choice-control"><input id="bareShaft" type="checkbox" data-default-checked="false"> Bare Shaft Pump</label></div>
       </div>
       <div class="card" style="padding:0;overflow:hidden">
-        <iframe id="selectorFrame" src="selector/index.html?v=42106" data-src="selector/index.html?v=42106" data-g2-src="selector/index.html?v=42106" data-g1-src="selector-g1/index.html?v=42106" title="KeySelector CHC G2 Series" style="width:100%;height:1900px;border:0;display:block"></iframe>
+        <iframe id="selectorFrame" src="selector/index.html?v=42107" data-src="selector/index.html?v=42107" data-g2-src="selector/index.html?v=42107" data-g1-src="selector-g1/index.html?v=42107" title="KeySelector CHC G2 Series" style="width:100%;height:1900px;border:0;display:block"></iframe>
       </div>
     </section>
 
@@ -831,7 +832,7 @@ aside::-webkit-scrollbar{width:0;height:0;display:none}
         <div class="card"><h2>CHC Series</h2><div id="productSeriesList" class="product-series-list"></div></div>
         <div class="card"><div class="page-title-row" style="margin-bottom:12px"><div><h2 id="productSeriesTitle" style="margin:0">Models</h2><div id="productModelCount" class="muted"></div></div></div><div id="productModelGrid" class="product-model-grid"></div></div>
       </div>
-      <iframe id="productSelectorFrame" src="about:blank" data-src="selector/product.html?product=1&v=42106" data-g2-src="selector/product.html?product=1&v=42106" data-g1-src="selector-g1/product.html?product=1&v=42106" title="CHC Product Curve" style="display:none"></iframe>
+      <iframe id="productSelectorFrame" src="about:blank" data-src="selector/product.html?product=1&v=42107" data-g2-src="selector/product.html?product=1&v=42107" data-g1-src="selector-g1/product.html?product=1&v=42107" title="CHC Product Curve" style="display:none"></iframe>
     </section>
 
     <section id="productGws" class="page">
@@ -1916,14 +1917,14 @@ aside::-webkit-scrollbar{width:0;height:0;display:none}
 <script src="v40407-role-authority.js?v=41708"></script>
 <script src="applications.js?v=409"></script>
 <script src="assembly.js?v=41913"></script>
-<script src="app.js?v=42106"></script>
+<script src="app.js?v=42107"></script>
 <script src="pricing.js?v=41700"></script>
 <script src="quotation-references.js?v=409"></script>
 <script src="categories.js?v=41700"></script>
-<script src="chc-g1-price-map-v41409.js?v=42106"></script>
+<script src="chc-g1-price-map-v41409.js?v=42107"></script>
 <script src="pricelist.js?v=414122"></script>
-<script src="chc-g1-product-data-v41411.js?v=42106"></script>
-<script src="product.js?v=42106"></script>
+<script src="chc-g1-product-data-v41411.js?v=42107"></script>
+<script src="product.js?v=42107"></script>
 <script src="manifold.js?v=41412"></script>
 <script src="roles.js?v=41708"></script>
 <script src="motor.js?v=409"></script>
@@ -2000,7 +2001,7 @@ aside::-webkit-scrollbar{width:0;height:0;display:none}
     try{sessionStorage.setItem(STORAGE_KEY,generation)}catch(_){}
     const frame=document.getElementById('selectorFrame');
     if(frame){
-      const wanted=generation==='G1'?(frame.dataset.g1Src||'selector-g1/index.html?v=42106'):(frame.dataset.g2Src||frame.dataset.src||'selector/index.html?v=42106');
+      const wanted=generation==='G1'?(frame.dataset.g1Src||'selector-g1/index.html?v=42107'):(frame.dataset.g2Src||frame.dataset.src||'selector/index.html?v=42107');
       const current=String(frame.getAttribute('src')||'');
       const expectedPath=generation==='G1'?'selector-g1/index.html':'selector/index.html';
       if(!current.includes(expectedPath))frame.setAttribute('src',wanted);
@@ -2012,7 +2013,7 @@ aside::-webkit-scrollbar{width:0;height:0;display:none}
     if(hint)hint.textContent=`Select a CHC ${generation} pumpset, then use Assembly or Quote in the result panel.`;
     return generation;
   }
-  window.KeySuiteCHCSelection={version:'4.21.06',setGeneration,getGeneration:()=>generation};
+  window.KeySuiteCHCSelection={version:'4.21.07',setGeneration,getGeneration:()=>generation};
   document.addEventListener('click',event=>{
     const button=event.target.closest('button[data-page="selector"][data-generation]');
     if(button)setGeneration(button.dataset.generation);
@@ -2021,7 +2022,7 @@ aside::-webkit-scrollbar{width:0;height:0;display:none}
   else setGeneration(generation);
 })();
 </script>
-<script src="v41200-bootstrap.js?v=42106"></script>
+<script src="v41200-bootstrap.js?v=42107"></script>
 
 <script id="v41412-static-product-generation">
 document.addEventListener('click',event=>{

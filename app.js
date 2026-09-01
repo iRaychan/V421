@@ -430,13 +430,14 @@ function populateQuotationHistoryFilters(rows=quotes()){
 }
 function normalizeCustomerRecord(row){
  let contacts=row.contacts||[];if(typeof contacts==='string'){try{contacts=JSON.parse(contacts)}catch(_){contacts=[]}}
- return {id:row.id,companyId:row.company_id,company:row.company_name||'',classification:row.classification||'',pricingCategoryId:row.pricing_category_id||'',defaultQuotationTemplateId:row.default_quotation_template_id||'',assignedUserEmail:row.assigned_user_email||'',createdByEmail:row.created_by_email||'',distanceKm:Number(row.distance_km||0),companyPhone:row.company_phone||'',address:row.address||'',terms:normalizeCustomerTermsDays(row.payment_terms),tinNumber:row.tin_number||'',brnNumber:row.business_registration_no||'',sstNumber:row.sst_number||'',msicCode:row.msic_code||'',businessActivity:row.business_activity||'',notes:row.notes||'',contacts:Array.isArray(contacts)?contacts:[],status:row.status||'active',createdAt:row.created_at||'',updatedAt:row.updated_at||''}
+ const pdc=!!row.pdc||/\bPDC\b/i.test(String(row.payment_terms||''));
+ return {id:row.id,companyId:row.company_id,company:row.company_name||'',classification:row.classification||'',pricingCategoryId:row.pricing_category_id||'',defaultQuotationTemplateId:row.default_quotation_template_id||'',assignedUserEmail:row.assigned_user_email||'',createdByEmail:row.created_by_email||'',distanceKm:Number(row.distance_km||0),companyPhone:row.company_phone||'',address:row.address||'',terms:pdc?'90':normalizeCustomerTermsDays(row.payment_terms),pdc,tinNumber:row.tin_number||'',brnNumber:row.business_registration_no||'',sstNumber:row.sst_number||'',msicCode:row.msic_code||'',businessActivity:row.business_activity||'',notes:row.notes||'',contacts:Array.isArray(contacts)?contacts:[],status:row.status||'active',createdAt:row.created_at||'',updatedAt:row.updated_at||''}
 }
 function customerClient(){return window.KeySuiteAuth?.getClient?.()||null}
 function companyMasterCustomer(company){
  const days=Number(company?.term_days||0);
  const category=(window.KEYSUITE_SECURE_DATA?.categories||[]).find(x=>x.name===company?.category);
- return {id:newUuid(),companyId:currentAccess().company_id,company:String(company?.name||'').trim(),classification:'',pricingCategoryId:category?.id||'',assignedUserEmail:currentEmail(),createdByEmail:currentEmail(),distanceKm:Number(company?.delivery_distance||0),companyPhone:company?.phone||'',address:company?.address||'',terms:String(Math.max(0,Math.round(days||0))),tinNumber:company?.tin||'',brnNumber:company?.business_registration_no||'',sstNumber:company?.sst_no||'',msicCode:company?.msic_code||'',businessActivity:company?.business_activities||'',notes:'',contacts:[],status:'active'};
+ return {id:newUuid(),companyId:currentAccess().company_id,company:String(company?.name||'').trim(),classification:'',pricingCategoryId:category?.id||'',assignedUserEmail:currentEmail(),createdByEmail:currentEmail(),distanceKm:Number(company?.delivery_distance||0),companyPhone:company?.phone||'',address:company?.address||'',terms:String(Math.max(0,Math.round(days||0))),pdc:false,tinNumber:company?.tin||'',brnNumber:company?.business_registration_no||'',sstNumber:company?.sst_no||'',msicCode:company?.msic_code||'',businessActivity:company?.business_activities||'',notes:'',contacts:[],status:'active'};
 }
 async function importCompanyMasters(client,rows){
  if(!isCustomerAdmin())return rows;
@@ -449,7 +450,7 @@ async function importCompanyMasters(client,rows){
  if(result.error){console.warn('Company master could not be added to Customers',result.error);return rows}
  return rows.concat((result.data||[]).map(normalizeCustomerRecord));
 }
-function remoteCustomerPayload(c){return {id:c.id,company_id:c.companyId||currentAccess().company_id,company_name:c.company,classification:c.classification||'',pricing_category_id:c.pricingCategoryId||null,default_quotation_template_id:c.defaultQuotationTemplateId||null,assigned_user_email:c.assignedUserEmail||currentEmail(),created_by_email:c.createdByEmail||currentEmail(),distance_km:Number(c.distanceKm||0),company_phone:c.companyPhone||'',address:c.address||'',payment_terms:normalizeCustomerTermsDays(c.terms),tin_number:c.tinNumber||'',business_registration_no:c.brnNumber||'',sst_number:c.sstNumber||'',msic_code:c.msicCode||'',business_activity:c.businessActivity||'',notes:c.notes||'',contacts:c.contacts||[],status:c.status||'active',updated_at:new Date().toISOString()}}
+function remoteCustomerPayload(c){return {id:c.id,company_id:c.companyId||currentAccess().company_id,company_name:c.company,classification:c.classification||'',pricing_category_id:c.pricingCategoryId||null,default_quotation_template_id:c.defaultQuotationTemplateId||null,assigned_user_email:c.assignedUserEmail||currentEmail(),created_by_email:c.createdByEmail||currentEmail(),distance_km:Number(c.distanceKm||0),company_phone:c.companyPhone||'',address:c.address||'',payment_terms:c.pdc?'90 Days PDC':normalizeCustomerTermsDays(c.terms),tin_number:c.tinNumber||'',business_registration_no:c.brnNumber||'',sst_number:c.sstNumber||'',msic_code:c.msicCode||'',business_activity:c.businessActivity||'',notes:c.notes||'',contacts:c.contacts||[],status:c.status||'active',updated_at:new Date().toISOString()}}
 async function loadSecureCustomers(){
  const client=customerClient();if(!client){customerSyncMode='local';customerSyncError='Secure customer connection is unavailable.';renderCustomerAccessNotice();return customers()}
  try{
@@ -543,8 +544,15 @@ function normalizeCustomerTermsDays(value){
  return String(days);
 }
 function formatCustomerTerms(value){
- const days=Number(normalizeCustomerTermsDays(value)||0);
+ const customer=value&&typeof value==='object'?value:null,raw=customer?(customer.pdc?'90 Days PDC':customer.terms):value;
+ if(customer?.pdc||/\bPDC\b/i.test(String(raw??'')))return '90 Days PDC';
+ const days=Number(normalizeCustomerTermsDays(raw)||0);
  return days>0?`${days} days`:'Cash before delivery';
+}
+function syncCustomerPdcUi(){
+ const box=$('customerPdc'),terms=$('customerTerms');if(!box||!terms)return;
+ if(box.checked){terms.value='90';terms.disabled=true;terms.title='PDC customers are presented as 90 Days PDC.'}
+ else{terms.disabled=false;terms.title=''}
 }
 function selectedQuotationCustomer(){
  const id=quotationPricingCustomerId||$('qCustomer')?.value||'';
@@ -593,7 +601,7 @@ function renderStartCustomerMenu(query=''){
  const q=String(query||'').trim().toLowerCase();let arr=[],title='Recent Customers';
  if(q){title='Search Results';arr=customers().filter(c=>String(c.company||'').toLowerCase().includes(q)).slice(0,12)}
  else{arr=startRecentCustomerIds().map(id=>customers().find(c=>c.id===id)).filter(Boolean).slice(0,8);if(!arr.length){title='Customers';arr=customers().slice().sort((a,b)=>String(a.company||'').localeCompare(String(b.company||''))).slice(0,8)}}
- const rows=arr.map(c=>`<button type="button" class="start-customer-option" data-start-customer-id="${esc(c.id)}"><b>${esc(c.company)}</b><small>${esc(c.classification||'Other')}${c.terms!=null?` · ${esc(formatCustomerTerms(c.terms))}`:''}</small></button>`).join('');
+ const rows=arr.map(c=>`<button type="button" class="start-customer-option" data-start-customer-id="${esc(c.id)}"><b>${esc(c.company)}</b><small>${esc(c.classification||'Other')}${c.terms!=null?` · ${esc(formatCustomerTerms(c))}`:''}</small></button>`).join('');
  menu.innerHTML=`<div class="start-customer-menu-title">${esc(title)}</div>${rows||'<div class="start-customer-empty">No matching customer.</div>'}<button type="button" class="start-new-customer" id="startNewCustomerMenu">+ New Customer</button>`;
  menu.hidden=false;
  menu.querySelectorAll('[data-start-customer-id]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.startCustomerId||'';if($('startCustomer'))$('startCustomer').value=id;switchDashboardCustomer(id);closeStartCustomerMenu()}));
@@ -780,6 +788,7 @@ function openNewCustomer(){
  $('customerEmpty').style.display='none';$('customerDetail').style.display='none';$('customerEditorCard').style.display='block';
  $('customerEditorTitle').textContent='Add New Customer';$('deleteCustomerBtn').style.display='none';
  ['customerId','company','companyPhone','address','customerTerms','tinNumber','brnNumber','sstNumber','msicCode','businessActivity','customerNotes'].forEach(id=>$(id).value='');
+ if($('customerPdc'))$('customerPdc').checked=false;syncCustomerPdcUi();
  $('customerDistance').value='0';$('customerClassification').value='';configureCustomerOwner(currentEmail());configureCustomerDistance();configureCustomerTemplate('');
  $('contactEditor').innerHTML='';contactRow();
  $('company').focus();
@@ -790,7 +799,7 @@ function editCustomer(id){
  $('customerEmpty').style.display='none';$('customerDetail').style.display='none';$('customerEditorCard').style.display='block';
  $('customerEditorTitle').textContent='Edit Customer';$('deleteCustomerBtn').textContent='Archive Customer';$('deleteCustomerBtn').style.display=isCustomerAdmin()?'inline-block':'none';
  $('customerId').value=c.id;$('company').value=c.company||'';$('companyPhone').value=formatMYPhone(c.companyPhone||'');
- $('address').value=c.address||'';$('customerTerms').value=normalizeCustomerTermsDays(c.terms);$('tinNumber').value=c.tinNumber||'';
+ $('address').value=c.address||'';$('customerTerms').value=c.pdc?'90':normalizeCustomerTermsDays(c.terms);if($('customerPdc'))$('customerPdc').checked=!!c.pdc;syncCustomerPdcUi();$('tinNumber').value=c.tinNumber||'';
  $('brnNumber').value=c.brnNumber||'';$('sstNumber').value=c.sstNumber||'';$('msicCode').value=c.msicCode||'';
  $('businessActivity').value=c.businessActivity||'';$('customerNotes').value=c.notes||'';$('customerDistance').value=Number(c.distanceKm||0);$('customerClassification').value=c.classification||'';configureCustomerOwner(c.assignedUserEmail||currentEmail());configureCustomerDistance();configureCustomerTemplate(c.defaultQuotationTemplateId||'');
  $('contactEditor').innerHTML='';(c.contacts?.length?c.contacts:[{}]).forEach(contactRow);
@@ -819,7 +828,7 @@ async function saveCustomer(){
  const button=$('saveCustomer');button.disabled=true;button.textContent='Saving…';
  try{
    const id=customerUuid($('customerId').value),old=customers().find(x=>x.id===id)||{};
-   const c={...old,id,companyId:old.companyId||currentAccess().company_id,company,classification:$('customerClassification').value||'',pricingCategoryId:old.pricingCategoryId||'',defaultQuotationTemplateId:$('customerDefaultQuotationTemplate')?.value||'',assignedUserEmail:isCustomerAdmin()?($('customerOwner').value||currentEmail()):currentEmail(),createdByEmail:old.createdByEmail||currentEmail(),distanceKm:isCustomerAdmin()?Math.max(0,Number($('customerDistance').value||0)):Number(old.distanceKm||0),companyPhone:formatMYPhone($('companyPhone').value),address:$('address').value.trim(),terms:normalizeCustomerTermsDays($('customerTerms').value),tinNumber:$('tinNumber').value.trim(),brnNumber:$('brnNumber').value.trim(),sstNumber:$('sstNumber').value.trim(),msicCode:$('msicCode').value.trim(),businessActivity:$('businessActivity').value.trim(),notes:$('customerNotes').value.trim(),contacts:getContacts(),status:'active'};
+   const c={...old,id,companyId:old.companyId||currentAccess().company_id,company,classification:$('customerClassification').value||'',pricingCategoryId:old.pricingCategoryId||'',defaultQuotationTemplateId:$('customerDefaultQuotationTemplate')?.value||'',assignedUserEmail:isCustomerAdmin()?($('customerOwner').value||currentEmail()):currentEmail(),createdByEmail:old.createdByEmail||currentEmail(),distanceKm:isCustomerAdmin()?Math.max(0,Number($('customerDistance').value||0)):Number(old.distanceKm||0),companyPhone:formatMYPhone($('companyPhone').value),address:$('address').value.trim(),terms:$('customerPdc')?.checked?'90':normalizeCustomerTermsDays($('customerTerms').value),pdc:!!$('customerPdc')?.checked,tinNumber:$('tinNumber').value.trim(),brnNumber:$('brnNumber').value.trim(),sstNumber:$('sstNumber').value.trim(),msicCode:$('msicCode').value.trim(),businessActivity:$('businessActivity').value.trim(),notes:$('customerNotes').value.trim(),contacts:getContacts(),status:'active'};
    const saved=await saveCustomerRemote(c);viewedCustomerId=saved.id;refreshAll();showCustomerDetail(saved.id);alert('Customer saved.');
  }catch(error){console.error(error);alert(`Customer could not be saved: ${error.message||error}`)}finally{button.disabled=false;button.textContent='Save Customer'}
 }
@@ -841,7 +850,7 @@ function showCustomerDetail(id){
  $('detailCompany').textContent=c.company;
  $('detailClassification').textContent=c.classification||'Other';$('detailOwner').textContent=customerOwnerName(c.assignedUserEmail);
  $('detailAddress').textContent=c.address||'-';$('detailPhone').textContent=formatMYPhone(c.companyPhone)||'-';$('detailDistance').textContent=`${Number(c.distanceKm||0).toLocaleString('en-MY',{maximumFractionDigits:1})} km`;
- $('detailTerms').textContent=formatCustomerTerms(c.terms);$('detailTin').textContent=c.tinNumber||'-';$('detailBrn').textContent=c.brnNumber||'-';
+ $('detailTerms').textContent=formatCustomerTerms(c);$('detailTin').textContent=c.tinNumber||'-';$('detailBrn').textContent=c.brnNumber||'-';
  $('detailSst').textContent=c.sstNumber||'-';$('detailMsic').textContent=c.msicCode||'-';
  $('detailBusinessActivity').textContent=c.businessActivity||'-';$('detailNotes').textContent=c.notes||'-';if($('detailQuotationTemplate'))$('detailQuotationTemplate').textContent=customerTemplateName(c.defaultQuotationTemplateId)||'Company default';
  $('detailContacts').innerHTML=(c.contacts||[]).map(x=>`<tr><td>${esc([x.prefix,x.name].filter(Boolean).join(' '))}</td><td>${esc(formatMYPhone(x.phone)||'-')}</td><td>${esc(x.email||'-')}</td></tr>`).join('')||`<tr><td colspan="3" class="muted">No contact persons saved.</td></tr>`;
@@ -914,7 +923,7 @@ function refreshQuotationContacts(){
  const contact=contacts[Number($('qContact').value)]||{};
  if($('qPrintedContact')&&!$('qPrintedContact').value)$('qPrintedContact').value=[contact.prefix,contact.name].filter(Boolean).join(' ');
  updateQuotationContactInfo();
- if(c)$('payment').value=formatCustomerTerms(c.terms);
+ if(c)$('payment').value=formatCustomerTerms(c);
 }
 function updateQuotationContactInfo(){
  const c=customers().find(x=>x.id===$('qCustomer').value);
@@ -976,6 +985,9 @@ function pumpPdfCounterContext(){
  const quoteNo=String($('quoteNo')?.value||'').trim().toUpperCase();
  return `${customerId}|${customerName}|${quoteNo}`;
 }
+function resetPumpPdfItemCounter(){
+ try{localStorage.removeItem('keysuite_pump_pdf_counter_v40606')}catch(_){}
+}
 function nextPumpPdfItemNumber(){
  const key='keysuite_pump_pdf_counter_v40606',context=pumpPdfCounterContext();
  let state={context:'',count:0};
@@ -1024,7 +1036,8 @@ function quotePumpPdfFilename(row,itemNumber){
 window.KeySuitePumpPdfNames={
  nextFromPayload:pump=>pumpPdfFilenameFromPayload(pump,pumpPdfHasSelectedCustomer()?nextPumpPdfItemNumber():0),
  nextFromRow:row=>quotePumpPdfFilename(row,pumpPdfHasSelectedCustomer()?nextPumpPdfItemNumber():0),
- context:pumpPdfCounterContext
+ context:pumpPdfCounterContext,
+ reset:resetPumpPdfItemCounter
 };
 function exportPumpDataSheet(row,filename){
  const raw=row.dataset.pumpData;
@@ -1387,7 +1400,7 @@ window.addEventListener('message',function(event){
  if(!ensureQuotationPricingContext('add a pump to the quotation'))return;
  showPage('quotation');
  const selectedCustomer=customers().find(x=>x.id===$('qCustomer').value);
- if(selectedCustomer){refreshQuotationContacts();$('payment').value=formatCustomerTerms(selectedCustomer.terms);}
+ if(selectedCustomer){refreshQuotationContacts();$('payment').value=formatCustomerTerms(selectedCustomer);}
  const material=p.keysuite_material||$('pumpMaterial').value;
  const seal=p.keysuite_seal||$('sealFaces').value;
  const elastomer=p.keysuite_elastomer||$('sealElastomer').value;
@@ -1687,10 +1700,12 @@ $('startCustomerClear')?.addEventListener('click',()=>{
    const ok=confirm(`This quotation contains ${count} item${count===1?'':'s'}.\n\nClearing the customer will delete all current quotation items and start a blank quotation. Continue?`);
    if(!ok)return;
    newQuote();
+   resetPumpPdfItemCounter();
    closeStartCustomerMenu();
    return;
  }
  if($('startCustomer'))$('startCustomer').value='';
+ resetPumpPdfItemCounter();
  switchDashboardCustomer('');
  closeStartCustomerMenu();
 });
@@ -1707,6 +1722,7 @@ $('startContact')?.addEventListener('change',()=>{
  if($('qPrintedContact'))$('qPrintedContact').value=value===''?'':[contact.prefix,contact.name].filter(Boolean).join(' ');
  updateQuotationContactInfo();syncStartContact();
 });
+$('customerPdc')?.addEventListener('change',syncCustomerPdcUi);
 $('companyPhone').addEventListener('blur',()=>$('companyPhone').value=formatMYPhone($('companyPhone').value));
 $('addQuoteItem').onclick=()=>{if(!canEditQuotation(true))return;const row=quoteItemRow({});focusNewQuoteItem(row);updateQuotationStateUi()};
 $('saveItemRemark')?.addEventListener('click',saveItemRemark);
