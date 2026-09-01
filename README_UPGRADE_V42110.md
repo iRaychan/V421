@@ -1,6 +1,6 @@
 # V4.21.10 Upgrade
 
-Replace the included web-app files and Supabase function files, then redeploy:
+Replace the supplied files and deploy the Telegram webhook:
 
 ```powershell
 npx.cmd supabase@latest functions deploy telegram-webhook --no-verify-jwt
