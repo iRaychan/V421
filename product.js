@@ -188,12 +188,12 @@
     try{sessionStorage.setItem(CHC_GENERATION_KEY,selectedChcGeneration)}catch(_){}
     const series=orderedSeries();if(!selectedSeries||!series.includes(selectedSeries))selectedSeries=series[0]||'';
     const input=$('productModelInput');if(input)input.value='';
-    const h1=document.querySelector('#productChc h1');if(h1)h1.textContent=`Product · CHC ${selectedChcGeneration}`;
+    const h1=document.querySelector('#productChc h1');if(h1)h1.textContent=`Product · CHC ${selectedChcGeneration==='G1'?'C4':'C6'}`;
     const help=document.querySelector('#productChc .page-title-row .muted');
     const frame=$('productSelectorFrame');if(frame){frameReady=false;queued=null;frame.src='about:blank'}
     if(help)help.textContent=selectedChcGeneration==='G1'
-      ?'CHC C4 hydraulic/product range. Curve, duty points, PDF, Quote and Assembly follow the CHC G2 format using the C4 hydraulic master data and IE2 motors.'
-      :'CHC G2 existing/current product range. Curve uses the original proven G2 Product curve path.';
+      ?'CHC C4 hydraulic/product range. Curve, duty points, PDF, Quote and Assembly follow the CHC C6 format using the C4 hydraulic master data and IE2 motors.'
+      :'CHC C6 existing/current product range. Curve uses the original proven C6 Product curve path.';
     render();
     return selectedChcGeneration;
   }

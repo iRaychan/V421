@@ -110,12 +110,15 @@
   };
   const productGroupLabel=value=>{
     const group=normalizeProductGroup(value);
-    return ({CHC:'CHC',CHC_G1:'CHC C4',CHC_G2:'CHC G2',ES:'End Suction',MOTOR:'Motor'})[group]||String(value||group).replace(/_/g,' ');
+    return ({CHC:'CHC',CHC_G1:'CHC C4',CHC_G2:'CHC C6',ES:'End Suction',MOTOR:'Motor'})[group]||String(value||group).replace(/_/g,' ');
   };
-  // V4.15.02 UI terminology: Price Group identifies the commercial
-  // price source. Generic CHC is legacy-only now that CHC is split into G1/G2.
+  // V4.21.09 naming: Price Group/admin pricing uses G1/G2; customer-facing Series uses C4/C6.
+  const priceGroupAdminLabel=value=>{
+    const group=normalizeProductGroup(value);
+    return ({CHC:'CHC G2',CHC_G1:'CHC G1',CHC_G2:'CHC G2',ES:'End Suction',MOTOR:'Motor'})[group]||String(value||group).replace(/_/g,' ');
+  };
   const PRICE_GROUP_OPTIONS=[
-    {value:'CHC_G1',label:'CHC C4'},
+    {value:'CHC_G1',label:'CHC G1'},
     {value:'CHC_G2',label:'CHC G2'},
     {value:'ES',label:'End Suction'},
     {value:'MOTOR',label:'Motor'}
@@ -206,7 +209,7 @@
   function brandSeriesFallback(brand,productGroup){
     const group=normalizeProductGroup(productGroup),fam=baseFamily(group),key=String(brand?.brand_key||brand?.brand_name||'').trim().toLowerCase();
     if(group==='CHC_G1'&&isMasterBrand(brand))return 'CHC C4';
-    if(group==='CHC_G2'&&isMasterBrand(brand))return 'CHC G2';
+    if(group==='CHC_G2'&&isMasterBrand(brand))return 'CHC C6';
     if(fam==='ES')return 'ES';
     if(fam==='CHC'){
       if(isMasterBrand(brand))return 'CHC';
@@ -221,6 +224,10 @@
   function brandSeriesFor(brandOrId,productGroup){
     const brand=typeof brandOrId==='object'?brandOrId:(byBrandId(brandOrId)||masterBrand());
     const group=normalizeProductGroup(productGroup);
+    // V4.21.09: B.G.Reich user-facing CHC generation names are fixed as C4/C6,
+    // even if an older saved Brand Series row still contains G1/G2 wording.
+    if(isMasterBrand(brand)&&group==='CHC_G1')return 'CHC C4';
+    if(isMasterBrand(brand)&&group==='CHC_G2')return 'CHC C6';
     const row=brandSeriesRow(brand?.id,group);
     return String(row?.brand_series||brandSeriesFallback(brand,group)||productGroupLabel(group)).trim();
   }
@@ -586,7 +593,7 @@
     tr.dataset.brandId=String(data?.id||id);msg('v391BrandMessage',`${name} saved.`,'info');await loadData({force:true});
   }
   async function deleteBrandRow(tr){const id=tr.dataset.brandId;if(!id){tr.remove();return}if(!confirm('Delete this brand and its OEM mappings?'))return;const {error}=await client().from('ks_oem_brands').delete().eq('id',id).eq('company_id',companyId());if(error)return msg('v391BrandMessage',multibrandDbError(error),'error');await loadData();}
-  function mappingSortValue(m,key){const brand=byBrandId(m.brand_id),group=normalizeProductGroup(m.master_family);if(key==='brand')return String(brand?.brand_name||'');if(key==='family')return productGroupLabel(group);if(key==='series')return brandSeriesFor(brand,group);return ''}
+  function mappingSortValue(m,key){const brand=byBrandId(m.brand_id),group=normalizeProductGroup(m.master_family);if(key==='brand')return String(brand?.brand_name||'');if(key==='family')return priceGroupAdminLabel(group);if(key==='series')return brandSeriesFor(brand,group);return ''}
   function setMappingSort(key){if(state.mappingSort.key===key)state.mappingSort.dir*=-1;else state.mappingSort={key,dir:1};renderMappings()}
   function renderMappingSortHeaders(){document.querySelectorAll('[data-map-sort]').forEach(b=>{const active=b.dataset.mapSort===state.mappingSort.key,label=b.dataset.mapSort==='brand'?'Brand':b.dataset.mapSort==='family'?'Price Group':'Brand Series';b.classList.toggle('active',active);b.textContent=label+(active?(state.mappingSort.dir>0?' ↑':' ↓'):'')})}
   function renderMappings(){const body=$('v391MappingRows');if(!body)return;body.innerHTML='';const {key,dir}=state.mappingSort;state.mappings.slice().sort((a,b)=>mappingSortValue(a,key).localeCompare(mappingSortValue(b,key),undefined,{numeric:true,sensitivity:'base'})*dir||String(a.master_series||'').localeCompare(String(b.master_series||''),undefined,{numeric:true})).forEach(m=>addMappingRow(m));renderMappingSortHeaders();}
@@ -605,7 +612,7 @@
     const stored=normalizeProductGroup(selected||'');
     const current=stored==='CHC'?'CHC_G2':stored;
     const options=PRICE_GROUP_OPTIONS.slice();
-    if(current&&!options.some(x=>x.value===current))options.push({value:current,label:productGroupLabel(current)});
+    if(current&&!options.some(x=>x.value===current))options.push({value:current,label:priceGroupAdminLabel(current)});
     const placeholder=current?'':'<option value="" selected disabled>Select Price Group</option>';
     return placeholder+options.map(x=>`<option value="${esc(x.value)}" ${current===x.value?'selected':''}>${esc(x.label)}</option>`).join('');
   }
@@ -650,7 +657,7 @@
     const {data,error}=await c.rpc('keysuite_save_oem_series_mapping_v41503',{p_mapping:payload});
     if(error)return msg('v391BrandMessage',multibrandDbError(error),'error');
     tr.dataset.mappingId=String(data?.id||id);tr.dataset.originalBrandId=payload.brand_id;tr.dataset.originalFamily=productGroup;
-    await loadData({force:true});msg('v391BrandMessage',`${productGroupLabel(productGroup)} Price Group mapping saved.`,'info');
+    await loadData({force:true});msg('v391BrandMessage',`${priceGroupAdminLabel(productGroup)} Price Group mapping saved.`,'info');
   }
   async function deleteMapping(tr){if(!tr.dataset.mappingId){tr.remove();return}const c=client(),brandId=tr.querySelector('.v391-map-brand')?.value||tr.dataset.originalBrandId,family=tr.querySelector('.v391-map-family')?.value||tr.dataset.originalFamily;const {error}=await c.from('ks_oem_brand_family_map').delete().eq('id',tr.dataset.mappingId).eq('company_id',companyId());if(error)return msg('v391BrandMessage',multibrandDbError(error),'error');await cleanupBrandSeriesIfUnused(brandId,family);await loadData({force:true});msg('v391BrandMessage','OEM mapping deleted. Product > Brand availability refreshed.','info');}
 
@@ -717,7 +724,7 @@
   const BUILTIN_FAMILIES={
     'b.g.reich':[
       {label:'CHC C4',family:'CHC',productGroup:'CHC_G1',page:'productChc',generation:'G1'},
-      {label:'CHC G2',family:'CHC',productGroup:'CHC_G2',page:'productChc',generation:'G2'},
+      {label:'CHC C6',family:'CHC',productGroup:'CHC_G2',page:'productChc',generation:'G2'},
       {label:'End Suction',family:'ES',page:'productEs'},
       {label:'Motor',family:'MOTOR',page:'productMotor'}
     ],
@@ -870,10 +877,10 @@
       });
       submenu.insertBefore(b,submenu.firstChild);return b;
     };
-    if(!chc)chc=create('selector','CHC','CHC G2');
+    if(!chc)chc=create('selector','CHC','CHC C6');
     if(!es)es=create('selectorEs','ES','ES');
     const master=masterBrand();
-    if(chc){chc.dataset.v41222SelectorFallback='CHC';chc.dataset.generation='G2';chc.textContent=master?(brandSeriesFor(master,'CHC_G2')||'CHC G2'):'CHC G2';}
+    if(chc){chc.dataset.v41222SelectorFallback='CHC';chc.dataset.generation='G2';chc.textContent=master?(brandSeriesFor(master,'CHC_G2')||'CHC C6'):'CHC C6';}
     if(es){es.dataset.v41222SelectorFallback='ES';es.textContent=master?(brandSeriesFor(master,'ES')||'ES'):'ES';}
     return {chc,es};
   }

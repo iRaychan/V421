@@ -154,7 +154,7 @@
     return priceBrands().filter(b=>allowed.has(String(b.id)));
   }
   function priceGroupLabel(group){
-    return ({CHC_G1:'CHC C4',CHC_G2:'CHC G2',ES:'End Suction',MOTOR:'Motor',BASEPLATE:'Baseplate',COUPLING:'Coupling',KEYPLC:'KeyPLC Panel',MANIFOLD:'Manifold',GWS:'GWS Tank'})[normalizedPriceGroup(group)]||String(group||'');
+    return ({CHC_G1:'CHC C4',CHC_G2:'CHC C6',ES:'End Suction',MOTOR:'Motor',BASEPLATE:'Baseplate',COUPLING:'Coupling',KEYPLC:'KeyPLC Panel',MANIFOLD:'Manifold',GWS:'GWS Tank'})[normalizedPriceGroup(group)]||String(group||'');
   }
   function priceEntrySeriesLabel(entry){
     if(entry.label)return String(entry.label);

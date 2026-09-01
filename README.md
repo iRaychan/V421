@@ -1,4 +1,4 @@
-# KeySuite V4.21.08 FULL CLEAN
+# KeySuite V4.21.09 FULL CLEAN
 
 Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
@@ -44,3 +44,7 @@ See `README_V42107.md` for the PDF metadata, Quick Selection first-click, Dashbo
 
 ## V4.21.08
 See `README_V42108.md` for the corrected independent PDC checkbox and quotation payment-term formatting.
+
+
+## V4.21.09
+See `README_V42109.md` for the CHC G1/G2 admin Price Group and C4/C6 user-facing naming normalization.

@@ -157,7 +157,7 @@
     body.innerHTML=rows.map(product=>{
       const prices=currencyPrices(product,currency),rarities=currencyRarities(product,currency);
       return `<tr data-chc-pricelist-row="${esc(product.id)}">
-        <td><b>${esc(product.model)}</b><span class="chc-price-source">${isG1?'CHC C4 · OWN PRICE LIST':'CHC G2'}</span></td>
+        <td><b>${esc(product.model)}</b><span class="chc-price-source">${isG1?'CHC G1 · OWN PRICE LIST':'CHC G2'}</span></td>
         <td>${priceEditor(currency,prices.CHC,'CHC',product.id)}</td><td>${rarityEditor(rarities.CHC,'CHC',product.id)}</td>
         <td>${priceEditor(currency,prices.CHCS,'CHCS',product.id)}</td><td>${rarityEditor(rarities.CHCS,'CHCS',product.id)}</td>
         <td>${priceEditor(currency,prices.CHCN,'CHCN',product.id)}</td><td>${rarityEditor(rarities.CHCN,'CHCN',product.id)}</td>
@@ -172,7 +172,7 @@
     if(note){
       note.classList.toggle('g1',isG1);
       note.textContent=isG1
-        ?'CHC C4 has its own independent Price List. CHC G2 prices are not used. C4 technical/product master remains locked.'
+        ?'CHC G1 has its own independent Price List. CHC G2 prices are not used. G1 technical/product master remains locked.'
         :'CHC G2 is the existing/current Price List and is unchanged.';
     }
   }
@@ -254,7 +254,7 @@
   }
 
   async function saveMultiplier(prefix,currency){
-    if(prefix==='chc'&&selectedChcGeneration==='G1'){message('chc','CHC C4 has its own prices. The CHC currency multiplier is shared and can be maintained under CHC G2.','info');return}
+    if(prefix==='chc'&&selectedChcGeneration==='G1'){message('chc','CHC G1 has its own prices. The CHC currency multiplier is shared and can be maintained under CHC G2.','info');return}
     if(!isOwner()){message(prefix,'Your role is not allowed to maintain Price List settings.','error');return}
     const key=`${prefix}:${currency}`;
     if(!unlockedMultipliers.has(key))return;
@@ -286,7 +286,7 @@
   }
 
   function beginMultiplierUnlock(prefix,currency){
-    if(prefix==='chc'&&selectedChcGeneration==='G1'){message('chc','CHC C4 prices are editable below. The shared CHC multiplier can be maintained under CHC G2.','info');return}
+    if(prefix==='chc'&&selectedChcGeneration==='G1'){message('chc','CHC G1 prices are editable below. The shared CHC multiplier can be maintained under CHC G2.','info');return}
     const key=`${prefix}:${currency}`;if(!isOwner()||unlockedMultipliers.has(key))return;
     const input=el(multiplierInputId(prefix,currency));
     originalMultiplierValues.set(key,input?.value||ratesFor(prefix)[currency]);

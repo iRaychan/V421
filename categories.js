@@ -32,7 +32,7 @@
       currencies:[...new Set((Array.isArray(rule.currencies)?rule.currencies:(Array.isArray(fallback.currencies)?fallback.currencies:[])).map(v=>String(v||'').toUpperCase()).filter(v=>['USD','RMB','MYR'].includes(v)))]
     };
   }
-  const productLabel=product=>product==='CHC_G1'?'CHC C4':product==='CHC_G2'?'CHC G2':String(product||'');
+  const productLabel=product=>product==='CHC_G1'?'CHC G1':product==='CHC_G2'?'CHC G2':String(product||'');
   const rateFamily=product=>['CHC_G1','CHC_G2'].includes(String(product||'').toUpperCase())?'CHC':String(product||'CHC').toUpperCase();
   function ruleFor(category,product=selectedProduct){
     const fallback=product==='CHC_G2'?defaultRule():newCategoryRule();

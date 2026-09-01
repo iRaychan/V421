@@ -770,10 +770,11 @@ async function guidedUserAvailableProducts(service:any,companyId:string,user:any
     const bid=String(brandId||'').trim();if(!bid)return;
     if(scope==='assigned'&&!assignedKeys.has(`${bid}|*`)&&!assignedKeys.has(`${bid}|${meta.roleFamily}`))return;
     const name=String(brandName||brandNames.get(bid)||bid).trim();
-    const brandSeries=String(brandSeriesValue||brandSeriesByKey.get(`${bid}|${meta.group}`)||'').trim();
-    // Only the CHC generation families replace their internal generation label
-    // at the Product menu. ES intentionally remains "End Suction" here so its
-    // next drill-down stage can be the configured Brand Series (normally ES).
+    const storedBrandSeries=String(brandSeriesValue||brandSeriesByKey.get(`${bid}|${meta.group}`)||'').trim();
+    const masterChcSeries=masterBrandIds.has(bid)&&meta.group==='CHC_G1'?'CHC C4':masterBrandIds.has(bid)&&meta.group==='CHC_G2'?'CHC C6':'';
+    const brandSeries=masterChcSeries||storedBrandSeries;
+    // User-facing B.G.Reich generation labels are always C4/C6. Other brands
+    // keep their configured selling Brand Series (for example VMS C4 / VMS C6).
     const productLabel=(meta.group==='CHC_G1'||meta.group==='CHC_G2')&&brandSeries?brandSeries:meta.productLabel;
     const key=`${bid}|${meta.group}`;if(candidates.has(key))return;
     candidates.set(key,{key,brand_id:bid,brand_name:name,brand_logo:String(brandLogos.get(bid)||'').trim(),price_group:meta.group,role_family:meta.roleFamily,product_label:productLabel,brand_series:brandSeries,has_curve:meta.hasCurve,product_type:meta.productType});
@@ -817,6 +818,8 @@ async function guidedProductPresentation(service:any,companyId:string,product:an
     if((mr.error||!rows.length)&&['CHC_G1','CHC_G2'].includes(group)){mr=await service.from('ks_oem_brand_family_map').select('master_family,master_series,selling_series,active').eq('company_id',companyId).eq('brand_id',brandId).eq('active',true).eq('master_family','CHC');rows=mr.data||[]}
     const preferred=rows.find((x:any)=>/^CHC$/i.test(String(x.master_series||'')))||rows[0];if(preferred){masterSeries=String(preferred.master_series||'').trim();sellingSeries=String(preferred.selling_series||'').trim()}
   }catch(_){ }
+  // V4.21.09: never expose legacy G1/G2 naming for the B.G.Reich master brand.
+  if(['CHC_G1','CHC_G2'].includes(group)&&String(product?.brand_name||'').trim().toLowerCase()==='b.g.reich')brandSeries=group==='CHC_G1'?'CHC C4':'CHC C6';
   return {brandSeries,sellingSeries,masterSeries};
 }
 function guidedAliasModel(model:any,presentation:any,group:any){let value=String(model||'').trim(),selling=String(presentation?.sellingSeries||'').trim();if(!selling)return value;const g=String(group||'').toUpperCase();if(g==='CHC_G1'||g==='CHC_G2')value=value.replace(/^(?:CHCS|CHCN|CHC)\b/i,selling);else if(g==='ES')value=value.replace(/^ES\b/i,selling);return value}
