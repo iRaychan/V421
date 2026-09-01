@@ -1,4 +1,4 @@
-# KeySuite V4.21.07 FULL CLEAN
+# KeySuite V4.21.08 FULL CLEAN
 
 Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
@@ -40,3 +40,7 @@ See `README_V42105.md` for the corrected C4/G1 dimension drawings and G1 numeric
 
 ## V4.21.07
 See `README_V42107.md` for the PDF metadata, Quick Selection first-click, Dashboard Item reset and PDC changes.
+
+
+## V4.21.08
+See `README_V42108.md` for the corrected independent PDC checkbox and quotation payment-term formatting.

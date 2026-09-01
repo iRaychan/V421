@@ -431,7 +431,7 @@ function populateQuotationHistoryFilters(rows=quotes()){
 function normalizeCustomerRecord(row){
  let contacts=row.contacts||[];if(typeof contacts==='string'){try{contacts=JSON.parse(contacts)}catch(_){contacts=[]}}
  const pdc=!!row.pdc||/\bPDC\b/i.test(String(row.payment_terms||''));
- return {id:row.id,companyId:row.company_id,company:row.company_name||'',classification:row.classification||'',pricingCategoryId:row.pricing_category_id||'',defaultQuotationTemplateId:row.default_quotation_template_id||'',assignedUserEmail:row.assigned_user_email||'',createdByEmail:row.created_by_email||'',distanceKm:Number(row.distance_km||0),companyPhone:row.company_phone||'',address:row.address||'',terms:pdc?'90':normalizeCustomerTermsDays(row.payment_terms),pdc,tinNumber:row.tin_number||'',brnNumber:row.business_registration_no||'',sstNumber:row.sst_number||'',msicCode:row.msic_code||'',businessActivity:row.business_activity||'',notes:row.notes||'',contacts:Array.isArray(contacts)?contacts:[],status:row.status||'active',createdAt:row.created_at||'',updatedAt:row.updated_at||''}
+ return {id:row.id,companyId:row.company_id,company:row.company_name||'',classification:row.classification||'',pricingCategoryId:row.pricing_category_id||'',defaultQuotationTemplateId:row.default_quotation_template_id||'',assignedUserEmail:row.assigned_user_email||'',createdByEmail:row.created_by_email||'',distanceKm:Number(row.distance_km||0),companyPhone:row.company_phone||'',address:row.address||'',terms:normalizeCustomerTermsDays(row.payment_terms),pdc,tinNumber:row.tin_number||'',brnNumber:row.business_registration_no||'',sstNumber:row.sst_number||'',msicCode:row.msic_code||'',businessActivity:row.business_activity||'',notes:row.notes||'',contacts:Array.isArray(contacts)?contacts:[],status:row.status||'active',createdAt:row.created_at||'',updatedAt:row.updated_at||''}
 }
 function customerClient(){return window.KeySuiteAuth?.getClient?.()||null}
 function companyMasterCustomer(company){
@@ -450,7 +450,7 @@ async function importCompanyMasters(client,rows){
  if(result.error){console.warn('Company master could not be added to Customers',result.error);return rows}
  return rows.concat((result.data||[]).map(normalizeCustomerRecord));
 }
-function remoteCustomerPayload(c){return {id:c.id,company_id:c.companyId||currentAccess().company_id,company_name:c.company,classification:c.classification||'',pricing_category_id:c.pricingCategoryId||null,default_quotation_template_id:c.defaultQuotationTemplateId||null,assigned_user_email:c.assignedUserEmail||currentEmail(),created_by_email:c.createdByEmail||currentEmail(),distance_km:Number(c.distanceKm||0),company_phone:c.companyPhone||'',address:c.address||'',payment_terms:c.pdc?'90 Days PDC':normalizeCustomerTermsDays(c.terms),tin_number:c.tinNumber||'',business_registration_no:c.brnNumber||'',sst_number:c.sstNumber||'',msic_code:c.msicCode||'',business_activity:c.businessActivity||'',notes:c.notes||'',contacts:c.contacts||[],status:c.status||'active',updated_at:new Date().toISOString()}}
+function remoteCustomerPayload(c){const days=normalizeCustomerTermsDays(c.terms);return {id:c.id,company_id:c.companyId||currentAccess().company_id,company_name:c.company,classification:c.classification||'',pricing_category_id:c.pricingCategoryId||null,default_quotation_template_id:c.defaultQuotationTemplateId||null,assigned_user_email:c.assignedUserEmail||currentEmail(),created_by_email:c.createdByEmail||currentEmail(),distance_km:Number(c.distanceKm||0),company_phone:c.companyPhone||'',address:c.address||'',payment_terms:c.pdc?(Number(days)>0?`${days} days PDC`:'PDC'):days,tin_number:c.tinNumber||'',business_registration_no:c.brnNumber||'',sst_number:c.sstNumber||'',msic_code:c.msicCode||'',business_activity:c.businessActivity||'',notes:c.notes||'',contacts:c.contacts||[],status:c.status||'active',updated_at:new Date().toISOString()}}
 async function loadSecureCustomers(){
  const client=customerClient();if(!client){customerSyncMode='local';customerSyncError='Secure customer connection is unavailable.';renderCustomerAccessNotice();return customers()}
  try{
@@ -544,15 +544,15 @@ function normalizeCustomerTermsDays(value){
  return String(days);
 }
 function formatCustomerTerms(value){
- const customer=value&&typeof value==='object'?value:null,raw=customer?(customer.pdc?'90 Days PDC':customer.terms):value;
- if(customer?.pdc||/\bPDC\b/i.test(String(raw??'')))return '90 Days PDC';
+ const customer=value&&typeof value==='object'?value:null,raw=customer?customer.terms:value;
+ const pdc=!!customer?.pdc||/\bPDC\b/i.test(String(value??''));
  const days=Number(normalizeCustomerTermsDays(raw)||0);
- return days>0?`${days} days`:'Cash before delivery';
+ if(days>0)return `${days} days${pdc?' PDC':''}`;
+ return pdc?'PDC':'Cash before delivery';
 }
 function syncCustomerPdcUi(){
  const box=$('customerPdc'),terms=$('customerTerms');if(!box||!terms)return;
- if(box.checked){terms.value='90';terms.disabled=true;terms.title='PDC customers are presented as 90 Days PDC.'}
- else{terms.disabled=false;terms.title=''}
+ terms.disabled=false;terms.title=box.checked?'PDC will be appended to the entered Terms (days) in quotations.':'';
 }
 function selectedQuotationCustomer(){
  const id=quotationPricingCustomerId||$('qCustomer')?.value||'';
@@ -799,7 +799,7 @@ function editCustomer(id){
  $('customerEmpty').style.display='none';$('customerDetail').style.display='none';$('customerEditorCard').style.display='block';
  $('customerEditorTitle').textContent='Edit Customer';$('deleteCustomerBtn').textContent='Archive Customer';$('deleteCustomerBtn').style.display=isCustomerAdmin()?'inline-block':'none';
  $('customerId').value=c.id;$('company').value=c.company||'';$('companyPhone').value=formatMYPhone(c.companyPhone||'');
- $('address').value=c.address||'';$('customerTerms').value=c.pdc?'90':normalizeCustomerTermsDays(c.terms);if($('customerPdc'))$('customerPdc').checked=!!c.pdc;syncCustomerPdcUi();$('tinNumber').value=c.tinNumber||'';
+ $('address').value=c.address||'';$('customerTerms').value=normalizeCustomerTermsDays(c.terms);if($('customerPdc'))$('customerPdc').checked=!!c.pdc;syncCustomerPdcUi();$('tinNumber').value=c.tinNumber||'';
  $('brnNumber').value=c.brnNumber||'';$('sstNumber').value=c.sstNumber||'';$('msicCode').value=c.msicCode||'';
  $('businessActivity').value=c.businessActivity||'';$('customerNotes').value=c.notes||'';$('customerDistance').value=Number(c.distanceKm||0);$('customerClassification').value=c.classification||'';configureCustomerOwner(c.assignedUserEmail||currentEmail());configureCustomerDistance();configureCustomerTemplate(c.defaultQuotationTemplateId||'');
  $('contactEditor').innerHTML='';(c.contacts?.length?c.contacts:[{}]).forEach(contactRow);
@@ -828,7 +828,7 @@ async function saveCustomer(){
  const button=$('saveCustomer');button.disabled=true;button.textContent='Saving…';
  try{
    const id=customerUuid($('customerId').value),old=customers().find(x=>x.id===id)||{};
-   const c={...old,id,companyId:old.companyId||currentAccess().company_id,company,classification:$('customerClassification').value||'',pricingCategoryId:old.pricingCategoryId||'',defaultQuotationTemplateId:$('customerDefaultQuotationTemplate')?.value||'',assignedUserEmail:isCustomerAdmin()?($('customerOwner').value||currentEmail()):currentEmail(),createdByEmail:old.createdByEmail||currentEmail(),distanceKm:isCustomerAdmin()?Math.max(0,Number($('customerDistance').value||0)):Number(old.distanceKm||0),companyPhone:formatMYPhone($('companyPhone').value),address:$('address').value.trim(),terms:$('customerPdc')?.checked?'90':normalizeCustomerTermsDays($('customerTerms').value),pdc:!!$('customerPdc')?.checked,tinNumber:$('tinNumber').value.trim(),brnNumber:$('brnNumber').value.trim(),sstNumber:$('sstNumber').value.trim(),msicCode:$('msicCode').value.trim(),businessActivity:$('businessActivity').value.trim(),notes:$('customerNotes').value.trim(),contacts:getContacts(),status:'active'};
+   const c={...old,id,companyId:old.companyId||currentAccess().company_id,company,classification:$('customerClassification').value||'',pricingCategoryId:old.pricingCategoryId||'',defaultQuotationTemplateId:$('customerDefaultQuotationTemplate')?.value||'',assignedUserEmail:isCustomerAdmin()?($('customerOwner').value||currentEmail()):currentEmail(),createdByEmail:old.createdByEmail||currentEmail(),distanceKm:isCustomerAdmin()?Math.max(0,Number($('customerDistance').value||0)):Number(old.distanceKm||0),companyPhone:formatMYPhone($('companyPhone').value),address:$('address').value.trim(),terms:normalizeCustomerTermsDays($('customerTerms').value),pdc:!!$('customerPdc')?.checked,tinNumber:$('tinNumber').value.trim(),brnNumber:$('brnNumber').value.trim(),sstNumber:$('sstNumber').value.trim(),msicCode:$('msicCode').value.trim(),businessActivity:$('businessActivity').value.trim(),notes:$('customerNotes').value.trim(),contacts:getContacts(),status:'active'};
    const saved=await saveCustomerRemote(c);viewedCustomerId=saved.id;refreshAll();showCustomerDetail(saved.id);alert('Customer saved.');
  }catch(error){console.error(error);alert(`Customer could not be saved: ${error.message||error}`)}finally{button.disabled=false;button.textContent='Save Customer'}
 }
