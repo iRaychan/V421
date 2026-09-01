@@ -1383,9 +1383,21 @@ window.addEventListener('message',function(event){
  }
  if(event.data.type==='KEYSUITE_SELECTION_EMPTY'){alert(`Please run an ${fromEs?'ES':'CHC'} selection first.`);return}
  if(event.data.type!=='KEYSUITE_ADD_SELECTION')return;
- const p=event.data.payload||{};
+ const rawPayload=event.data.payload||{};
+ const p={...rawPayload};
  const route=event.data.route||pendingSelectionRoute||'quotation';pendingSelectionRoute='quotation';
  if(fromEs||isEsSelectionPayload(p)){void routeEsSelection(p,route).catch(error=>{console.error('ES selection routing failed',error);alert(error?.message||'Unable to route the ES selection.');});return}
+ // V4.21.14: never let CHC C4/G1 silently fall back to C6/G2 pricing.
+ // Prefer explicit selector identity; if an older cached selector omits it, use the active CHC generation.
+ {
+   const explicit=String(p.generation_code||p.keysuite_generation_code||'').toUpperCase();
+   const active=String(window.KeySuiteCHCSelection?.getGeneration?.()||'').toUpperCase();
+   const generation=explicit==='G1'||explicit==='G2'?explicit:(active==='G1'?'G1':'G2');
+   p.generation_code=generation;
+   p.keysuite_generation_code=generation;
+   p.keysuite_product_group_code=`CHC_${generation}`;
+   p.keysuite_price_group_code=`CHC_${generation}`;
+ }
  if(route==='assembly'){
    const quoteItem=chcAssemblyQuoteItem(p),bare=selectionBareMode(p,$('bareShaft')?.checked);
    const pricingModel=quoteItem.pricingModel||p.base_model||p.quotation_model||p.model;const item=window.KeySuitePricing?.buildChcAssemblyItem?.(pricingModel,p)||{model:quoteItem.model||pricingModel||'CHC Pumpset',qty:1,unitPrice:0,pumpData:p};
@@ -1452,16 +1464,16 @@ window.addEventListener('message',function(event){
    `Suction & Discharge: ${suctionDischarge}`,
    `Material: ${materialLine}`
  ].filter(Boolean);
- const pricedSelection=window.KeySuitePricing?.findPrice?.(quotationModel,{seal,elastomer,keysuite_seal:seal,keysuite_elastomer:elastomer,generation_code:p.generation_code||'G2'});
+ const pricedSelection=window.KeySuitePricing?.findPrice?.(quotationModel,{seal,elastomer,keysuite_seal:seal,keysuite_elastomer:elastomer,generation_code:p.generation_code});
  if(!window.KeySuitePricing?.ensureQuoteableCalculation?.(pricedSelection?.calc,quotationModel))return;
  const rows=[...document.querySelectorAll('.quote-item')];
  const empty=rows.length===1&&!rows[0].querySelector('.item-model').value&&!rows[0].querySelector('.item-description').value&&!+rows[0].querySelector('.item-price').value;
  const row=empty?rows[0]:quoteItemRow({});
- row.querySelector('.item-model').value=itemModel;row.querySelector('.item-qty').value=1;row.querySelector('.item-description').value=lines.join('\n');hydrateQuoteItemCapacity(row);row.dataset.pumpData=JSON.stringify({...p,quotation_model:quotationModel,display_model:displayQuotationModel,quotation_duty:dutyText,keysuite_material:material,keysuite_seal:seal,keysuite_elastomer:elastomer,keysuite_connection_type:connectionType,keysuite_bare_shaft:bare,keysuite_supply_mode:bare?'BARE':'COMPLETE'});
+ row.querySelector('.item-model').value=itemModel;row.querySelector('.item-qty').value=1;row.querySelector('.item-description').value=lines.join('\n');hydrateQuoteItemCapacity(row);row.dataset.pumpData=JSON.stringify({...p,generation_code:p.generation_code,keysuite_generation_code:p.keysuite_generation_code,keysuite_product_group_code:p.keysuite_product_group_code,keysuite_price_group_code:p.keysuite_price_group_code,quotation_model:quotationModel,display_model:displayQuotationModel,quotation_duty:dutyText,keysuite_material:material,keysuite_seal:seal,keysuite_elastomer:elastomer,keysuite_connection_type:connectionType,keysuite_bare_shaft:bare,keysuite_supply_mode:bare?'BARE':'COMPLETE'});
  if(bare){
    const motorDeduction=chcIe3MotorDeduction(p,'quotation');if(motorDeduction.error){if(!empty)row.remove();alert(motorDeduction.error);return}
    const barePrice=Math.max(0,Number(pricedSelection.calc.finalPrice||0)-motorDeduction.amount);row.querySelector('.item-price').value=barePrice.toFixed(2);row.dataset.pricingSource=JSON.stringify(chcBarePricingSource(pricedSelection,motorDeduction,barePrice));
- }else if(window.KeySuitePricing?.applyPriceToQuoteRow)window.KeySuitePricing.applyPriceToQuoteRow(row,quotationModel,{seal,elastomer,keysuite_seal:seal,keysuite_elastomer:elastomer,generation_code:p.generation_code||'G2'});
+ }else if(window.KeySuitePricing?.applyPriceToQuoteRow)window.KeySuitePricing.applyPriceToQuoteRow(row,quotationModel,{seal,elastomer,keysuite_seal:seal,keysuite_elastomer:elastomer,generation_code:p.generation_code});
  // V4.15.10: pricing above intentionally uses the technical/source CHC identity.
  // After pricing, hand the finished quote row to the currently selected Selling Brand.
  // This is required for OEM: source B.G.Reich / CHC stays internal, while quotation

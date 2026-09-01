@@ -75,7 +75,7 @@ function publicAssetBases(baseUrl:any){
 async function embedPublicPng(pdf:any,baseUrl:any,relativePath:string){
   const cleanPath=String(relativePath||'').replace(/^\/+/,''),errors:string[]=[];
   for(const base of publicAssetBases(baseUrl)){
-    const url=`${base}/${cleanPath}${cleanPath.includes('?')?'&':'?'}v=42113`;
+    const url=`${base}/${cleanPath}${cleanPath.includes('?')?'&':'?'}v=42114`;
     try{
       const response=await fetch(url,{headers:{'Accept':'image/png'}});
       if(!response.ok){errors.push(`${response.status} ${url}`);continue}
@@ -338,7 +338,7 @@ function drawPage2(page:any,logo:any,font:any,bold:any,a:any){
   y=drawSection(page,font,'Motor',y);
   y=drawRow4(page,font,['Brand',a.brand||'B.G.Reich','Country of Origin','Malaysia'],y);
   y=drawRow4(page,font,['Type','TEFC','Country of Manufacture','China'],y);
-  y=drawRow4(page,font,['Model',mt.model||'Data Not Available','Efficiency:','IE3'],y);
+  y=drawRow4(page,font,['Model',mt.model||'Data Not Available','Efficiency:',a.motorEfficiencyClass||'IE3'],y);
   y=drawRow4(page,font,['Rated Power',`${fmt(a.motorHp,2)} HP / ${fmt(a.motorKw,2)} kW`,'100%',mt.eff100!=null?`${fmt(mt.eff100,1)} %`:'-'],y);
   y=drawRow4(page,font,['Speed',mt.rpm!=null?`${fmt(mt.rpm,0)} rpm`:'-','75%',mt.eff75!=null?`${fmt(mt.eff75,1)} %`:'-'],y);
   y=drawRow4(page,font,['Rated FL Amp',mt.ratedAmp!=null?`${fmt(mt.ratedAmp,2)} Amp`:(mt.amp3!=null?`${fmt(mt.amp3,2)} Amp`:'-'),'Power Factor:-',''],y);
@@ -572,7 +572,7 @@ export async function generateCurvePdf(family:string,q:number,h:number,dutyText:
     :{length:esPs?.dimensions?.overall?.lengthMm?`${fmt(esPs.dimensions.overall.lengthMm,0)} mm`:'-',width:esPs?.dimensions?.overall?.widthMm?`${fmt(esPs.dimensions.overall.widthMm,0)} mm`:'-',height:esPs?.dimensions?.overall?.heightMm?`${fmt(esPs.dimensions.overall.heightMm,0)} mm`:'-',weight:esPs?.dimensions?.overall?.estimatedPumpsetWeightKg?`${fmt(esPs.dimensions.overall.estimatedPumpsetWeightKg,0)} kg`:'-'};
 
   const displayBrand=String(displayIdentity?.brand||'B.G.Reich').trim()||'B.G.Reich',displaySeries=String(displayIdentity?.series||(isChc?String(engine?.label||'CHC'):'ES')).trim()||(isChc?String(engine?.label||'CHC'):'ES'),displayModel=String(displayIdentity?.model||model).trim()||model;
-  const pageArgs={family:isChc?'CHC':fam,brand:displayBrand,series:displaySeries,model:displayModel,masterModel:model,dutyText,q,motorHp,motorKw,pole,hz,rpm,eff,npsh,brakeHp,suction,discharge,stages,impellerMm,maxPressure,dim,esPumpset:esPs,motorTech:mt,pumpset,material:materialFor(isChc?'CHC':fam,displayIdentity?.material),charts};
+  const pageArgs={family:isChc?'CHC':fam,brand:displayBrand,series:displaySeries,model:displayModel,masterModel:model,dutyText,q,motorHp,motorKw,pole,hz,rpm,eff,npsh,brakeHp,suction,discharge,stages,impellerMm,maxPressure,dim,esPumpset:esPs,motorTech:mt,motorEfficiencyClass:isChc?String(engine?.motorEff||'IE3'):'IE3',pumpset,material:materialFor(isChc?'CHC':fam,displayIdentity?.material),charts};
 
   const p1=pdf.addPage(LETTER);drawPage1(p1,logo,regular,bold,pageArgs);
   const p2=pdf.addPage(LETTER);drawPage2(p2,logo,font,bold,pageArgs);
