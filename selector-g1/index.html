@@ -194,7 +194,7 @@ body.product-frame main{display:block;max-width:none;padding:8px}body.product-fr
 </header>
 <main>
 <aside class="card inputs">
-  <div class="duty-header"><h3>Required Duty</h3><div class="duty-header-actions"><label id="enhancedToggleLabel" class="enhanced-toggle" hidden><input id="enhancedMode" type="checkbox" disabled> Enhanced</label><button id="go" type="button">Select</button></div></div>
+  <div class="duty-header"><h3>Required Duty</h3><div class="duty-header-actions"><label id="enhancedToggleLabel" class="enhanced-toggle"><input id="enhancedMode" type="checkbox"> Enhanced</label><button id="go" type="button">Select</button></div></div>
   <button class="export-btn mobile-export-btn" type="button" onclick="exportPDF()">PDF</button>
   <label>Flow</label>
   <div class="row"><input id="flow" type="number" value="" step="0.1" placeholder=""><select id="fu"><option value="m3h">m³/h</option><option value="lpm">L/min</option><option value="lps">L/s</option><option value="usgpm">US GPM</option><option value="igpm">IGPM</option></select></div>
@@ -604,7 +604,7 @@ const KEYSUITE_ENHANCED_MAX_RATIO=KEYSUITE_ENHANCED_MAX_HZ/DB.base_hz;
 const KEYSUITE_ENHANCED_MAX_RPM=3480;
 function keychcEnhancedModelName(model){const raw=String(model||'').trim();return raw&& !/E$/i.test(raw)?raw+'E':raw;}
 function keychcVisibleModelName(model,enhanced=!!selectionState?.enhanced){return enhanced?keychcEnhancedModelName(model):String(model||'');}
-function keychcEnhancedEnabled(){return false}
+function keychcEnhancedEnabled(){const el=document.getElementById('enhancedMode');return !!(el?el.checked:selectionState?.enhanced)}
 function keychcMixedRawPoint(curve,mix,i){
  const q=Number(curve.flow?.[i]),hf=Number(curve.head_per_stage?.[i]);if(!Number.isFinite(q)||!Number.isFinite(hf))return null;
  const hs=mix.small>0?Number(curve.head_per_stage_2?.[i]):0,hss=mix.smallest>0?Number(curve.head_per_stage_3?.[i]):0;
@@ -1533,7 +1533,7 @@ setTimeout(keychcLoadDisplaySettings,0);
  const evt=(el.type==='number')?'input':'change';
  el.addEventListener(evt,()=>{const best=selectionState.models[selectionState.selectedIndex];updateKeyCHCCurveStatus(best);if(best)renderSelected();});
 });
-enhancedMode?.addEventListener('change',()=>{const on=false;if(enhancedMode)enhancedMode.checked=false;updateEnhancedModeUI();speedUnit.value='hz';speedInput.value=on?String(KEYSUITE_ENHANCED_MAX_HZ):'50';hzHidden.value=on?String(KEYSUITE_ENHANCED_MAX_HZ):'50';selectionState={...selectionState,enhanced:on,models:[],selectedIndex:0,hz:on?KEYSUITE_ENHANCED_MAX_HZ:50,selectionHz:on?KEYSUITE_ENHANCED_MAX_HZ:50,curveHz:on?KEYSUITE_ENHANCED_MAX_HZ:50};alternatives.innerHTML='';out.innerHTML=`<div class="warning">${on?'Enhanced Curve selected. Press Select to calculate.':'Standard curve selected at 50 Hz. Press Select to calculate.'}</div>`;});
+enhancedMode?.addEventListener('change',()=>{const on=!!enhancedMode.checked;updateEnhancedModeUI();speedUnit.value='hz';speedInput.value=on?String(KEYSUITE_ENHANCED_MAX_HZ):'50';hzHidden.value=on?String(KEYSUITE_ENHANCED_MAX_HZ):'50';selectionState={...selectionState,enhanced:on,models:[],selectedIndex:0,hz:on?KEYSUITE_ENHANCED_MAX_HZ:50,selectionHz:on?KEYSUITE_ENHANCED_MAX_HZ:50,curveHz:on?KEYSUITE_ENHANCED_MAX_HZ:50};alternatives.innerHTML='';out.innerHTML=`<div class="warning">${on?'Enhanced Curve selected. Press Select to calculate.':'Standard curve selected at 50 Hz. Press Select to calculate.'}</div>`;});
 updateEnhancedModeUI();
 go.onclick=run;
 keychcRenderDutyPointEditor();
@@ -1551,7 +1551,7 @@ alternatives.innerHTML='';
  function syncControlsFromState(){
   try{flow.value=(selectionState.rawFlowText!==undefined&&selectionState.rawFlowText!==''?selectionState.rawFlowText:(selectionState.rawFlow??selectionState.q??''));head.value=(selectionState.rawHeadText!==undefined&&selectionState.rawHeadText!==''?selectionState.rawHeadText:(selectionState.rawHead??selectionState.h??''));fu.value=selectionState.flowUnit||'m3h';hu.value=selectionState.headUnit||'m';
    motorEff.value=selectionState.motorEffClass||'IE2';motorPhase.value=selectionState.motorPhase||'3Ph';updateMotorVoltageRange();
-   const enhanced=false;selectionState.enhanced=false;if(enhancedMode)enhancedMode.checked=false;updateEnhancedModeUI();
+   const enhanced=!!selectionState.enhanced;if(enhancedMode)enhancedMode.checked=enhanced;updateEnhancedModeUI();
    const hz=enhanced?KEYSUITE_ENHANCED_MAX_HZ:Number(selectionState.curveHz||selectionState.hz||50);speedUnit.value='hz';speedInput.value=hz.toFixed(1);hzHidden.value=String(hz);selectionState.curveHz=hz;selectionState.hz=hz;
   }catch(e){}
  }
@@ -1623,11 +1623,11 @@ alternatives.innerHTML='';
   const msg=event.data||{};
   if(msg.type==='KEYSUITE_DASHBOARD_RESET'){selectionState={q:0,h:0,hz:50,selectionHz:50,curveHz:50,rawFlow:0,rawHead:0,rawFlowText:'',rawHeadText:'',flowUnit:'m3h',headUnit:'m',models:[],selectedIndex:0,enhanced:false};if(enhancedMode)enhancedMode.checked=false;updateEnhancedModeUI();alternatives.innerHTML='';return;}
   if(msg.type==='KEYSUITE_DASHBOARD_SELECT'||msg.type==='KEYSUITE_DASHBOARD_OPEN_MODEL'){
-   const enhanced=false;
-   selectionState={q:0,h:0,hz:50,selectionHz:50,curveHz:50,rawFlow:0,rawHead:0,rawFlowText:'',rawHeadText:'',flowUnit:'m3h',headUnit:'m',models:[],selectedIndex:0,enhanced:false};alternatives.innerHTML='';
+   const enhanced=msg.enhanced===true;
+   selectionState={q:0,h:0,hz:enhanced?KEYSUITE_ENHANCED_MAX_HZ:50,selectionHz:enhanced?KEYSUITE_ENHANCED_MAX_HZ:50,curveHz:enhanced?KEYSUITE_ENHANCED_MAX_HZ:50,rawFlow:0,rawHead:0,rawFlowText:'',rawHeadText:'',flowUnit:'m3h',headUnit:'m',models:[],selectedIndex:0,enhanced};alternatives.innerHTML='';
    const quick=msg.quickSelection===true,rawFlow=quick&&Number.isFinite(Number(msg.rawFlow))?Number(msg.rawFlow):Number(msg.flowM3h||0),rawHead=quick&&Number.isFinite(Number(msg.rawHead))?Number(msg.rawHead):Number(msg.headM||0),rawFlowText=quick&&msg.rawFlowText!=null?String(msg.rawFlowText):String(rawFlow),rawHeadText=quick&&msg.rawHeadText!=null?String(msg.rawHeadText):String(rawHead);
    flowInput.value=rawFlowText;headInput.value=rawHeadText;flowUnitInput.value=quick&&msg.flowUnit?msg.flowUnit:'m3h';headUnitInput.value=quick&&msg.headUnit?msg.headUnit:'m';
-   if(enhancedMode)enhancedMode.checked=false;updateEnhancedModeUI();speedUnit.value='hz';speedInput.value='50';hzHidden.value='50';updateSpeedConversion();run();if(selectionState?.models?.length){selectionState.quickSelection=quick;renderSelected();}
+   if(enhancedMode)enhancedMode.checked=enhanced;updateEnhancedModeUI();speedUnit.value='hz';speedInput.value=enhanced?String(KEYSUITE_ENHANCED_MAX_HZ):'50';if(enhanced)hzHidden.value=String(KEYSUITE_ENHANCED_MAX_HZ);else updateSpeedConversion();run();if(selectionState?.models?.length){selectionState.quickSelection=quick;renderSelected();}
    if(msg.type==='KEYSUITE_DASHBOARD_OPEN_MODEL'&&msg.model){const wanted=String(msg.model).toLowerCase();let idx=selectionState.models.findIndex(x=>String(x.model).toLowerCase()===wanted);if(idx<0){const wm=DB.models.find(x=>String(x.model).toLowerCase()===wanted),alt=wm&&keychcAlternativeMaxCandidate(wm);if(alt){selectionState.models.push(alt);idx=selectionState.models.length-1}}if(idx>=0){selectionState.selectedIndex=idx;renderAlternatives();renderSelected();}}
    if(msg.type==='KEYSUITE_DASHBOARD_SELECT'){const data=currentSelection();if(data)data.alternatives=keychcDashboardAlternatives();window.parent?.postMessage({type:'KEYSUITE_DASHBOARD_RESULT',requestId:msg.requestId,family:'CHC',suitable:!!data,data},'*');}return;
   }
