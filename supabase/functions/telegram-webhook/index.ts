@@ -947,9 +947,18 @@ function guidedPreviousVisibleCatalogPath(value:any){
 function guidedExactActionText(customer:any,product:any,exact:any){
   return `${customer?`Customer: ${customer.company_name}\n`:''}Product: ${guidedProductButtonLabel(product)}\nModel: ${exact.display_model||exact.master_model}${exact.guided_configuration_label?`\nConfiguration: ${exact.guided_configuration_label}`:''}\n\nChoose action:`;
 }
-async function guidedSaveExactCatalogChoice(service:any,telegramToken:string,companyId:string,chatId:string,senderId:string,session:any,customer:any,product:any,path:any[],selected:any,context:any){
+async async function guidedSaveExactCatalogChoice(service:any,telegramToken:string,companyId:string,chatId:string,senderId:string,session:any,customer:any,product:any,path:any[],selected:any,context:any){
+  const group=String(product?.price_group||'').toUpperCase();
+  // V4.21.10: an exact model selected from Product drill-down already has a locked
+  // Brand + generation/series context. Never send that label back through the
+  // global Fast Search matcher. Open the scoped CHC C4/C6 or ES model directly
+  // and generate its rated curve on the same click.
+  if(product?.has_curve===true&&['CHC_G1','CHC_G2','ES'].includes(group)){
+    const label=`${guidedProductButtonLabel(product)} - ${String(selected?.label||selected?.meta?.display_model||selected?.meta?.master_model||'Model')}`;
+    return await keybotFastOpenPreparedMatch(service,telegramToken,companyId,chatId,senderId,session,customer,{product,selected,path,label},{...context,keybot_scoped_catalog:true});
+  }
   const exact=guidedCatalogExactChoice(selected),saved=await saveKeybotSession(service,companyId,chatId,senderId,{mode:'guided',step:'guided_exact_model_action',selected_customer_id:String(customer?.id||'')||null,context:{...context,guided_product:product,guided_catalog_path:path,guided_catalog_choices:null,guided_exact_model:exact}});
-  await telegramSend(telegramToken,chatId,guidedExactActionText(customer,product,exact),guidedExactActionMenu(product.has_curve===true,String(product.price_group||'').toUpperCase()==='ES'));
+  await telegramSend(telegramToken,chatId,guidedExactActionText(customer,product,exact),guidedExactActionMenu(product.has_curve===true,group==='ES'));
   return saved||session;
 }
 async function guidedStartCatalog(service:any,telegramToken:string,companyId:string,chatId:string,senderId:string,session:any,customer:any,user:any,product:any){
@@ -1077,7 +1086,7 @@ function keybotFastExactMayOverrideSession(session:any){
   const mode=String(session?.mode||'').trim(),step=String(session?.step||'').trim();if(!mode||!step||step==='idle')return true;
   // V4.19.11: exact-model Fast Search has priority over ordinary navigation and stale
   // hydraulic prompts. Only deliberate editing fields keep ownership of typed text.
-  const protectedSteps=new Set(['pump_options','draft_edit_qty','guided_es_assembly_edit_pump','guided_es_assembly_edit_motor','guided_es_assembly_edit_baseplate','guided_es_assembly_coupling_type','guided_es_assembly_coupling_size','keyplc_edit_pump','keyplc_edit_panel','keyplc_edit_manifold','keyplc_edit_manifold_size','keyplc_edit_tank']);
+  const protectedSteps=new Set(['pump_options','draft_edit_qty','guided_catalog','guided_fast_model_choice','guided_es_assembly_edit_pump','guided_es_assembly_edit_motor','guided_es_assembly_edit_baseplate','guided_es_assembly_coupling_type','guided_es_assembly_coupling_size','keyplc_edit_pump','keyplc_edit_panel','keyplc_edit_manifold','keyplc_edit_manifold_size','keyplc_edit_tank']);
   return !(protectedSteps.has(step)||step.startsWith('pump_option_'));
 }
 function keybotFastRequestedPole(text:any){const m=String(text||'').match(/\b([24])\s*P(?:OLE)?\b/i);return Number(m?.[1]||0)}
@@ -1123,7 +1132,7 @@ async function keybotFastModelMatches(service:any,companyId:string,products:any[
     }
     if(requestedPole)continue;
     let rows:any[]=[];try{rows=await guidedCatalogRows(service,product)}catch(_){continue}
-    for(const r of rows){let master=String(r.model||'').trim();if(!master)continue;const display=guidedAliasModel(master,presentation,group)||master,labels=[display,master];let score=99;for(const label of labels){const k=cleanSearch(label);if(k===query)score=Math.min(score,0);else if(k.startsWith(query))score=Math.min(score,1);else if(k.includes(query))score=Math.min(score,2)}if(score>2)continue;const selected={kind:'model',value:String(r.id||master),label:display,meta:{id:String(r.id||''),master_model:master,display_model:display}},entry={product,selected,path:[selected],label:`${String(product.brand_name||'Brand')} - ${display}`,score};(score===0?exact:partial).push(entry)}
+    for(const r of rows){let master=String(r.model||'').trim();if(!master)continue;const display=guidedAliasModel(master,presentation,group)||master,labels=[display,master];let score=99;for(const label of labels){const k=cleanSearch(label);if(k===query)score=Math.min(score,0);else if(k.startsWith(query))score=Math.min(score,1);else if(k.includes(query))score=Math.min(score,2)}if(score>2)continue;const selected={kind:'model',value:String(r.id||master),label:display,meta:{id:String(r.id||''),master_model:master,display_model:display}},scopeLabel=guidedProductButtonLabel(product),entry={product,selected,path:[selected],label:`${scopeLabel} - ${display}`,score};(score===0?exact:partial).push(entry)}
   }
   const arr=exact.length?exact:partial;const seen=new Set<string>();return arr.sort((a:any,b:any)=>a.score-b.score||guidedNaturalCompare(a.label,b.label)).filter((x:any)=>{const k=[x.product?.key,x.selected?.meta?.master_model,x.selected?.meta?.pole||0].join('|');if(seen.has(k))return false;seen.add(k);return true}).slice(0,12)
 }

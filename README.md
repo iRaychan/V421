@@ -1,4 +1,4 @@
-# KeySuite V4.21.09 FULL CLEAN
+# KeySuite V4.21.10 FULL CLEAN
 
 Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
@@ -48,3 +48,13 @@ See `README_V42108.md` for the corrected independent PDC checkbox and quotation 
 
 ## V4.21.09
 See `README_V42109.md` for the CHC G1/G2 admin Price Group and C4/C6 user-facing naming normalization.
+
+
+## V4.21.10
+
+- KeyBot Product drill-down now locks the selected Brand + CHC generation/Series context.
+- Exact CHC C4/C6 and ES model buttons bypass global Fast Search and open the scoped model directly.
+- Exact scoped pump selection now sends model details and the rated curve on the same click.
+- Direct free-text ambiguous CHC searches remain supported, but C4/C6 choices are labelled distinctly instead of showing duplicate B.G.Reich model buttons.
+- `guided_catalog` and `guided_fast_model_choice` own their reply-keyboard text and cannot be intercepted by Fast Search.
+- Requires redeploy of `telegram-webhook`; no database migration is required.
