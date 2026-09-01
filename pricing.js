@@ -41,7 +41,7 @@
     return {customer,distanceKm:Math.max(0,Number(options.distanceKm??customer?.distanceKm??0)),fuelPrice:Math.max(0,Number(options.fuelPrice??secureData.fuel_price??2)),fuelBasePrice:Math.max(0,Number(options.fuelBasePrice??secureData.fuel_base_price??2))};
   }
 
-  const familyLabel=family=>family==='CHC_G1'?'CHC G1':family==='CHC_G2'?'CHC G2':String(family||'');
+  const familyLabel=family=>family==='CHC_G1'?'CHC C4':family==='CHC_G2'?'CHC G2':String(family||'');
   const normalizedFamily=family=>{const raw=String(family||'CHC_G2').toUpperCase();return ['CHC_G1','CHC_G2','CHC','ES','GWS','KEYPLC','MANIFOLD','MOTOR','COUPLING','BASEPLATE'].includes(raw)?raw:'CHC_G2'};
   function multipliers(family='CHC_G2'){
     const raw=normalizedFamily(family),code=['CHC_G1','CHC_G2'].includes(raw)?'CHC':raw,rates=secureData.productMultipliers?.[code]||{};

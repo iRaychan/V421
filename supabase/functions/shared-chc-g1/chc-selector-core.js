@@ -170,4 +170,5 @@ g.KeySuiteCHCCore=Object.freeze({
   VERSION,select,evaluateModel,mostSuitableCompare,bepInfo,modelComparator,
   parseImpellerMix,fitMixedHeadCurve,fitMixedEfficiencyCurve,fitCurve,fitValue,polyfit,sampleFit
 });
+g.KeySuiteCHCG1Core=g.KeySuiteCHCCore;
 })(globalThis);

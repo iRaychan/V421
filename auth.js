@@ -84,7 +84,7 @@
       chcG1Products=await client.from('ks_products_chc_g1').select('*').order('source_row');
       if(chcG1Products.error)throw chcG1Products.error;
     }catch(error){
-      console.warn('CHC G1 independent Price List is not installed yet. Run V41410_CHC_G1_INDEPENDENT_PRICELIST.sql.',error);
+      console.warn('CHC C4 independent Price List is not installed yet. Run V41410_CHC_G1_INDEPENDENT_PRICELIST.sql.',error);
       chcG1Products={data:[]};
     }
     let customerPricingRows=[];
@@ -137,7 +137,7 @@
         }
       })),
       chcG1Products:(chcG1Products.data||[]).map(p=>({
-        id:p.id,generation:'G1',category:p.product_category||'CHC G1',model:p.model,source_row:p.source_row,
+        id:p.id,generation:'G1',category:p.product_category||'CHC C4',model:p.model,source_row:p.source_row,
         pricesByCurrency:{
           USD:{CHC:p.chc_usd===null?null:Number(p.chc_usd),CHCS:p.chcs_usd===null?null:Number(p.chcs_usd),CHCN:p.chcn_usd===null?null:Number(p.chcn_usd)},
           RMB:{CHC:p.chc_rmb===null?null:Number(p.chc_rmb),CHCS:p.chcs_rmb===null?null:Number(p.chcs_rmb),CHCN:p.chcn_rmb===null?null:Number(p.chcn_rmb)},

@@ -4,7 +4,7 @@
   if (window.__KEYSUITE_V394410_MULTIBRAND__) return;
   window.__KEYSUITE_V394410_MULTIBRAND__=true;
 
-  const VERSION='4.21.01';
+  const VERSION='4.21.02';
   const $=id=>document.getElementById(id);
   const clone=v=>JSON.parse(JSON.stringify(v??{}));
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -110,12 +110,12 @@
   };
   const productGroupLabel=value=>{
     const group=normalizeProductGroup(value);
-    return ({CHC:'CHC',CHC_G1:'CHC G1',CHC_G2:'CHC G2',ES:'End Suction',MOTOR:'Motor'})[group]||String(value||group).replace(/_/g,' ');
+    return ({CHC:'CHC',CHC_G1:'CHC C4',CHC_G2:'CHC G2',ES:'End Suction',MOTOR:'Motor'})[group]||String(value||group).replace(/_/g,' ');
   };
   // V4.15.02 UI terminology: Price Group identifies the commercial
   // price source. Generic CHC is legacy-only now that CHC is split into G1/G2.
   const PRICE_GROUP_OPTIONS=[
-    {value:'CHC_G1',label:'CHC G1'},
+    {value:'CHC_G1',label:'CHC C4'},
     {value:'CHC_G2',label:'CHC G2'},
     {value:'ES',label:'End Suction'},
     {value:'MOTOR',label:'Motor'}
@@ -205,7 +205,7 @@
   }
   function brandSeriesFallback(brand,productGroup){
     const group=normalizeProductGroup(productGroup),fam=baseFamily(group),key=String(brand?.brand_key||brand?.brand_name||'').trim().toLowerCase();
-    if(group==='CHC_G1'&&isMasterBrand(brand))return 'CHC G1';
+    if(group==='CHC_G1'&&isMasterBrand(brand))return 'CHC C4';
     if(group==='CHC_G2'&&isMasterBrand(brand))return 'CHC G2';
     if(fam==='ES')return 'ES';
     if(fam==='CHC'){
@@ -716,7 +716,7 @@
 
   const BUILTIN_FAMILIES={
     'b.g.reich':[
-      {label:'CHC G1',family:'CHC',productGroup:'CHC_G1',page:'productChc',generation:'G1'},
+      {label:'CHC C4',family:'CHC',productGroup:'CHC_G1',page:'productChc',generation:'G1'},
       {label:'CHC G2',family:'CHC',productGroup:'CHC_G2',page:'productChc',generation:'G2'},
       {label:'End Suction',family:'ES',page:'productEs'},
       {label:'Motor',family:'MOTOR',page:'productMotor'}
@@ -913,7 +913,7 @@
       families.forEach(f=>{
         const page=route(f.family),btn=document.createElement('button');
         btn.type='button';btn.className='v391-family-btn';
-        // V4.21.01: Selection visible name follows the saved Brand Series.
+        // V4.21.02: Selection visible name follows the saved Brand Series.
         // CHC G1 and G2 are independent hydraulic generations using the same Selection format.
         btn.textContent=brandSeriesFor(brand,f.productGroup||f.family)||productGroupLabel(f.productGroup||f.family)||String(f.family||'').toUpperCase();
         btn.dataset.brandId=brand.id;btn.dataset.family=f.family;btn.dataset.page=page;

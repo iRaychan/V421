@@ -1,4 +1,4 @@
-/* KeySuite V4.21.01 — Quick Pump Selection account-scope + customer Price-gated Brand / Series.
+/* KeySuite V4.21.02 — Quick Pump Selection account-scope + customer Price-gated Brand / Series.
    Preserves the user-entered Quick Selection flow/head units into the selected-model view and PDF.
    Hydraulic selection remains in m³/hr and metres. */
 (() => {
@@ -57,7 +57,7 @@ function entries(){
       return;
     }
     const groups=mappings().filter(m=>String(m.brand_id)===String(b.id)).map(m=>normalizeGroup(m.master_family));
-    // V4.21.01: G1 and G2 are separate CHC hydraulic generations.
+    // V4.21.02: G1 and G2 are separate CHC hydraulic generations.
     if(groups.includes('CHC_G1'))out.push({brand:b,family:'CHC',productGroup:'CHC_G1',key:keyOf(b.id,'CHC_G1')});
     if(groups.includes('CHC_G2')||groups.includes('CHC'))out.push({brand:b,family:'CHC',productGroup:'CHC_G2',key:keyOf(b.id,'CHC')});
     if(groups.includes('ES'))out.push({brand:b,family:'ES',productGroup:'ES',key:keyOf(b.id,'ES')});
@@ -288,7 +288,7 @@ const entryKey=value=>typeof value==='string'?upper(value):String(value?.key||en
 function frame(value){return $(entryFamily(value)==='CHC'?'selectorFrame':'selectorEsFrame')}
 function expectedFrameSrc(value,x=frame(value)){
   const family=entryFamily(value);
-  if(family==='CHC')return chcGeneration(value)==='G1'?(x?.dataset?.g1Src||'selector-g1/index.html?v=42101'):(x?.dataset?.g2Src||x?.dataset?.src||'selector/index.html?v=42101');
+  if(family==='CHC')return chcGeneration(value)==='G1'?(x?.dataset?.g1Src||'selector-g1/index.html?v=42102'):(x?.dataset?.g2Src||x?.dataset?.src||'selector/index.html?v=42102');
   return x?.dataset?.src||'selector-es/index.html';
 }
 function ensureFrameState(value){const x=frame(value);if(!x)return {frame:null,changed:false};const src=expectedFrameSrc(value,x),current=String(x.getAttribute('src')||'');const expectedPath=entryFamily(value)==='CHC'?(chcGeneration(value)==='G1'?'selector-g1/index.html':'selector/index.html'):'selector-es/index.html';const changed=!current.includes(expectedPath);if(changed)x.setAttribute('src',src);return {frame:x,changed}}
@@ -357,7 +357,7 @@ window.addEventListener('KEYSUITE_CUSTOMER_BRAND_PREFERENCE_CHANGED',event=>{
 });
 window.addEventListener('KEYSUITE_BRANDS_ERROR',()=>{state.prefLoaded=false;renderBrandState()});
 window.addEventListener('KEYSUITE_V393_BRAND_CONTEXT_CHANGED',()=>{if(!api()?.state?.coreReady)return;if(!state.prefLoaded){loadPreference();return}const valid=new Set(entries().map(e=>e.key));state.savedKeys=new Set([...state.savedKeys].filter(k=>valid.has(k)));renderPreference();renderResults(true)});
-window.KeySuiteV39442Dashboard={version:'4.21.01',runSelected,renderResults,renderPreference,loadPreference,masterSeries,seriesFor,brandSeriesFor,cancelPending,removeMaterialControls,presentationContext};
+window.KeySuiteV39442Dashboard={version:'4.21.02',runSelected,renderResults,renderPreference,loadPreference,masterSeries,seriesFor,brandSeriesFor,cancelPending,removeMaterialControls,presentationContext};
 window.KeySuiteV3944Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39444Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39445Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39446Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39447Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV39449Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV394410Dashboard=window.KeySuiteV39442Dashboard;window.KeySuiteV40201Dashboard=window.KeySuiteV39442Dashboard;
 let attempts=0;function boot(){attempts++;if(setup())return;if(attempts<40)setTimeout(boot,200)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

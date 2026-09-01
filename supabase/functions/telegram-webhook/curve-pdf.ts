@@ -1,7 +1,11 @@
 import { PDFDocument, StandardFonts, rgb, degrees } from 'https://esm.sh/pdf-lib@1.17.1?target=deno';
+// Load C4/G1 first and preserve it under dedicated aliases. Then load C6/G2 into the legacy globals.
+import '../shared-chc-g1/chc-data.js';
+import '../shared-chc-g1/chc-selector-core.js';
 import '../shared-chc/chc-data.js';
 import '../shared-chc/chc-selector-core.js';
 import { CHC_DIMENSIONS } from './chc-dimensions.ts';
+import { CHC_G1_DIMENSIONS } from './chc-g1-dimensions.ts';
 import { REPORT_LOGO_BASE64, ES_DIMENSION_BASE64, CHC_DIMENSION_BASE64 } from './report-assets.ts';
 import './es-core.js';
 import './es-data.js';
@@ -9,10 +13,14 @@ import './motor-data.js';
 import './v40205-motor-baseplate-data.js';
 import './v40205-motor-baseplate.js';
 
-const CHC_DB:any=(globalThis as any).KeySuiteCHCData;
-const CHC_CORE:any=(globalThis as any).KeySuiteCHCCore;
+const CHC_DB:any=(globalThis as any).KeySuiteCHCData; // C6 / G2
+const CHC_CORE:any=(globalThis as any).KeySuiteCHCCore; // C6 / G2
+const CHC_G1_DB:any=(globalThis as any).KeySuiteCHCG1Data;
+const CHC_G1_CORE:any=(globalThis as any).KeySuiteCHCG1Core;
 const MB:any=(globalThis as any).KeySuiteMotorBaseplateV40205;
-if(!CHC_DB||!CHC_CORE)throw new Error('KeySuite canonical CHC selector core/data unavailable.');
+if(!CHC_DB||!CHC_CORE||!CHC_G1_DB||!CHC_G1_CORE)throw new Error('KeySuite CHC C4/C6 selector core/data unavailable.');
+function isChcFamily(fam:any){const f=String(fam||'').toUpperCase();return f==='CHC'||f==='CHC_G1'||f==='CHC_G2'}
+function chcEngine(fam:any){const f=String(fam||'').toUpperCase();return f==='CHC_G1'?{db:CHC_G1_DB,core:CHC_G1_CORE,generation:'G1',label:'CHC C4',motorEff:'IE2'}:{db:CHC_DB,core:CHC_CORE,generation:'G2',label:'CHC C6',motorEff:'IE3'}}
 
 type XY={x:number,y:number};
 type ChartSpec={
@@ -51,7 +59,7 @@ async function embedReportLogo(pdf:any,value:any){
   }
   return await pdf.embedPng(b64bytes(REPORT_LOGO_BASE64));
 }
-function sampleFit(f:any,count=120){return CHC_CORE.sampleFit(f,count)}
+function sampleFit(f:any,count=120,core:any=CHC_CORE){return core.sampleFit(f,count)}
 function sampleEsFit(points:XY[],order:number,yScale=1,count=180){
   const core=(globalThis as any).ESCore;
   const clean=(points||[]).filter(p=>finite(p.x)&&finite(p.y)).sort((a,b)=>a.x-b.x);
@@ -66,10 +74,11 @@ function sampleEsFit(points:XY[],order:number,yScale=1,count=180){
   }
   return out;
 }
-function selectChc(q:number,h:number,forcedModel:string=''){
+function selectChc(q:number,h:number,forcedModel:string='',family:string='CHC'){
+  const engine=chcEngine(family),db=engine.db,core=engine.core;
   const wanted=String(forcedModel||'').replace(/^VMS\b/i,'CHC').replace(/^CHCS\b/i,'CHC').replace(/^CHCN\b/i,'CHC').trim().toUpperCase();
-  if(wanted){const row=(CHC_DB?.models||[]).find((m:any)=>String(m.model||'').toUpperCase()===wanted);if(!row)return null;return CHC_CORE.evaluateModel(CHC_DB,row,q,h,50)}
-  return CHC_CORE.select(CHC_DB,q,h,50).selected;
+  if(wanted){const row=(db?.models||[]).find((m:any)=>String(m.model||'').toUpperCase()===wanted);if(!row)return null;return core.evaluateModel(db,row,q,h,50)}
+  return core.select(db,q,h,50).selected;
 }
 function esSelect(q:number,h:number,pole:number,forcedModel:string=''){
   const core=(globalThis as any).ESCore,db=(globalThis as any).ES_SELECTOR_DB;
@@ -84,15 +93,15 @@ function esSelect(q:number,h:number,pole:number,forcedModel:string=''){
   const points=core.curvePoints(p,Number(r.impellerMm),Number(r.speedRatio||1),120)||[];
   return {result:r,pump:p,duty:d,perf,motor,points,pole:Number(pole),rpm};
 }
-function motorTech(hp:number,pole:number){
+function motorTech(hp:number,pole:number,efficiencyClass:string='IE3'){
   try{
     if(MB&&typeof MB.lookupMotor==='function'){
-      const x=MB.lookupMotor({hp,pole,efficiencyClass:'IE3',voltage:415,phase:'3Ph',hz:50});
+      const x=MB.lookupMotor({hp,pole,efficiencyClass,voltage:415,phase:'3Ph',hz:50});
       if(x&&x.available)return x;
     }
   }catch(_){}
   const db=(globalThis as any).KEYSUITE_MOTOR_TECH_DB;
-  const row=(db?.IE3||[]).find((x:any)=>Math.abs(Number(x.hp)-Number(hp))<.011);
+  const row=(db?.[efficiencyClass]||db?.IE3||[]).find((x:any)=>Math.abs(Number(x.hp)-Number(hp))<.011);
   return row?{available:true,model:row.model,rpm:row.rpm,ratedAmp:row.amp3,eff100:row.eff100,eff75:row.eff75,pf100:row.pf100,pf75:row.pf75}:null;
 }
 function esPumpset(model:string,motorHp:number,motorKw:number,pole:number){
@@ -393,7 +402,7 @@ function drawPage3ES(page:any,logo:any,font:any,bold:any,a:any,dimImage:any){
 }
 function materialFor(fam:string,option:any=''){
   const m=String(option||'').toUpperCase().replace(/\s+/g,'');
-  if(fam==='CHC'){
+  if(isChcFamily(fam)){
     if(m==='SS316')return {casing:'SS316',impeller:'SS316',shaft:'SS316',seal:'Mechanical Seal'};
     if(m==='SS304')return {casing:'SS304',impeller:'SS304',shaft:'SS304',seal:'Mechanical Seal'};
     return {casing:'SS (CI Connection)',impeller:'Stainless Steel',shaft:'Stainless Steel',seal:'Mechanical Seal'};
@@ -406,10 +415,10 @@ function materialFor(fam:string,option:any=''){
 export function selectPumpSummary(family:string,q:number,h:number,esPole=0,forcedModel:string=''){
   const fam=String(family||'').toUpperCase();
   if(!(Number(q)>0&&Number(h)>0))throw new Error('Flow and head are required for pump selection.');
-  if(fam==='CHC'){
-    const s:any=selectChc(Number(q),Number(h),forcedModel);
-    if(!s)throw new Error(`No CHC model can meet ${fmt(q)} m³/hr @ ${fmt(h)} Mtr.`);
-    return {brand:'B.G.Reich',family:'CHC',series:'CHC',model:String(s.model||''),motor_kw:Number(s.motor_kw||0),motor_hp:Number(s.motor_hp||0),efficiency:Number(s.eff||0),npshr:Number(s.npsh||0),rpm:Number(s.rpm||CHC_DB?.curves?.[s.series]?.speed_rpm||2900),pole:2,stages:Number(s.stages||0),connection:String(s.connection||'-'),requested_flow_m3h:Number(q),requested_head_m:Number(h),selector_core_version:CHC_CORE.VERSION};
+  if(isChcFamily(fam)){
+    const engine=chcEngine(fam),s:any=selectChc(Number(q),Number(h),forcedModel,fam);
+    if(!s)throw new Error(`No ${engine.label} model can meet ${fmt(q)} m³/hr @ ${fmt(h)} Mtr.`);
+    return {brand:'B.G.Reich',family:'CHC',series:engine.label,generation_code:engine.generation,keysuite_generation_code:engine.generation,model:String(s.model||''),motor_kw:Number(s.motor_kw||0),motor_hp:Number(s.motor_hp||0),efficiency:Number(s.eff||0),npshr:Number(s.npsh||0),rpm:Number(s.rpm||engine.db?.curves?.[s.series]?.speed_rpm||2900),pole:2,stages:Number(s.stages||0),connection:String(s.connection||'-'),requested_flow_m3h:Number(q),requested_head_m:Number(h),selector_core_version:engine.core.VERSION};
   }
   if(fam==='ES'){
     const pole=Number(esPole);
@@ -421,13 +430,12 @@ export function selectPumpSummary(family:string,q:number,h:number,esPole=0,force
   throw new Error('Unsupported pump family.');
 }
 
-
 export function selectPumpCandidates(family:string,q:number,h:number,esPole=0,limit=6){
   const fam=String(family||'').toUpperCase(),max=Math.max(1,Math.min(12,Math.trunc(Number(limit)||6)));
   if(!(Number(q)>0&&Number(h)>0))return [];
-  if(fam==='CHC'){
-    const result=CHC_CORE.select(CHC_DB,Number(q),Number(h),50),rows=Array.isArray(result?.candidates)?result.candidates:[];
-    return rows.slice(0,max).map((x:any,rank:number)=>({brand:'B.G.Reich',family:'CHC',series:'CHC',model:String(x.model||''),motor_kw:Number(x.motor_kw||0),motor_hp:Number(x.motor_hp||0),efficiency:Number(x.eff||0),npshr:Number(x.npsh||0),rpm:Number(x.rpm||CHC_DB?.curves?.[x.series]?.speed_rpm||2900),pole:2,stages:Number(x.stages||0),connection:String(x.connection||'-'),requested_flow_m3h:Number(q),requested_head_m:Number(h),selector_core_version:CHC_CORE.VERSION,selector_rank:rank+1}));
+  if(isChcFamily(fam)){
+    const engine=chcEngine(fam),result=engine.core.select(engine.db,Number(q),Number(h),50),rows=Array.isArray(result?.candidates)?result.candidates:[];
+    return rows.slice(0,max).map((x:any,rank:number)=>({brand:'B.G.Reich',family:'CHC',series:engine.label,generation_code:engine.generation,keysuite_generation_code:engine.generation,model:String(x.model||''),motor_kw:Number(x.motor_kw||0),motor_hp:Number(x.motor_hp||0),efficiency:Number(x.eff||0),npshr:Number(x.npsh||0),rpm:Number(x.rpm||engine.db?.curves?.[x.series]?.speed_rpm||2900),pole:2,stages:Number(x.stages||0),connection:String(x.connection||'-'),requested_flow_m3h:Number(q),requested_head_m:Number(h),selector_core_version:engine.core.VERSION,selector_rank:rank+1}));
   }
   if(fam==='ES'){
     const pole=Number(esPole),core=(globalThis as any).ESCore,db=(globalThis as any).ES_SELECTOR_DB;if(!core||!db||![2,4].includes(pole))return [];
@@ -438,19 +446,19 @@ export function selectPumpCandidates(family:string,q:number,h:number,esPole=0,li
 }
 
 export async function generateCurvePdf(family:string,q:number,h:number,dutyText:string,_baseUrl:string,esPole=0,forcedModel:string='',displayIdentity:any=null){
-  const fam=String(family||'').toUpperCase();
+  const fam=String(family||'').toUpperCase(),isChc=isChcFamily(fam),engine=isChc?chcEngine(fam):null;
   let model='',motorKw=0,motorHp=0,eff=0,npsh=0,selectionShaft=0,dutyBrakeHp=0,rpm=0,pole=2,hz=50;
   let suction='-',discharge='-',stages=0,impellerMm=0,maxPressure=0,dim:any={},esPs:any=null;
   let headPoints:XY[]=[],effPoints:XY[]=[],powerPoints:XY[]=[],npsPoints:XY[]=[];
 
-  if(fam==='CHC'){
-    const s=selectChc(q,h,forcedModel);if(!s)throw new Error(`No CHC model can meet ${fmt(q)} m³/hr @ ${fmt(h)} Mtr.`);
+  if(isChc){
+    const s=selectChc(q,h,forcedModel,fam);if(!s)throw new Error(`No ${engine?.label||'CHC'} model can meet ${fmt(q)} m³/hr @ ${fmt(h)} Mtr.`);
     model=String(s.model);motorKw=Number(s.motor_kw||0);motorHp=Number(s.motor_hp||0);eff=Number(s.eff||0);npsh=Number(s.npsh||0);
-    selectionShaft=Number(s.shaft||0);rpm=Number((CHC_DB as any).curves[s.series]?.speed_rpm||2900);pole=2;hz=50;
-    suction=String(s.connection||'-');discharge=String(s.connection||'-');stages=Number(s.stages||0);maxPressure=Number(s.max_pressure_bar||0);dim=(CHC_DIMENSIONS as any)[s.model]||{};
-    headPoints=sampleFit(s.headFit);effPoints=sampleFit(s.effFit);
-    powerPoints=sampleFit(s.powerFit).map((p:any)=>({x:Number(p.x),y:Number(p.y)*1.34102209}));
-    npsPoints=sampleFit(s.npshFit);
+    selectionShaft=Number(s.shaft||0);rpm=Number(engine?.db?.curves?.[s.series]?.speed_rpm||2900);pole=2;hz=50;
+    suction=String(s.connection||'-');discharge=String(s.connection||'-');stages=Number(s.stages||0);maxPressure=Number(s.max_pressure_bar||0);dim=((engine?.generation==='G1'?CHC_G1_DIMENSIONS:CHC_DIMENSIONS) as any)[s.model]||{};
+    headPoints=sampleFit(s.headFit,120,engine?.core);effPoints=sampleFit(s.effFit,120,engine?.core);
+    powerPoints=sampleFit(s.powerFit,120,engine?.core).map((p:any)=>({x:Number(p.x),y:Number(p.y)*1.34102209}));
+    npsPoints=sampleFit(s.npshFit,120,engine?.core);
   }else if(fam==='ES'){
     pole=Number(esPole);if(pole!==2&&pole!==4)throw new Error('ES selection requires 2 Pole or 4 Pole.');
     const s=esSelect(q,h,pole,forcedModel);if(!s)throw new Error(`No ES ${pole} Pole model can meet ${fmt(q)} m³/hr @ ${fmt(h)} Mtr.`);
@@ -501,24 +509,24 @@ export async function generateCurvePdf(family:string,q:number,h:number,dutyText:
   const font={regular,bold};
   const logo=await embedReportLogo(pdf,displayIdentity?.logo);
   let dimImage:any=null;
-  if(fam==='CHC'){
-    const series=String((selectChc(q,h,forcedModel) as any)?.series||'');
+  if(isChc){
+    const series=String((selectChc(q,h,forcedModel,fam) as any)?.series||'');
     const b64=(CHC_DIMENSION_BASE64 as any)[series];if(b64)dimImage=await pdf.embedPng(b64bytes(b64));
   }else dimImage=await pdf.embedPng(b64bytes(ES_DIMENSION_BASE64));
 
-  const mt=motorTech(motorHp,pole);
-  const pumpEnvelope=fam==='CHC'?(Number(dim.d1||0)/2+Number(dim.d2||0)):0;
-  const chcLength=fam==='CHC'?Math.max(pumpEnvelope,Number(dim.pumpL||0)):0,chcWidth=fam==='CHC'?Math.max(pumpEnvelope,Number(dim.pumpW||0)):0;
-  const pumpset=fam==='CHC'
+  const mt=motorTech(motorHp,pole,isChc?String(engine?.motorEff||'IE3'):'IE3');
+  const pumpEnvelope=isChc?(Number(dim.d1||0)/2+Number(dim.d2||0)):0;
+  const chcLength=isChc?Math.max(pumpEnvelope,Number(dim.pumpL||0)):0,chcWidth=isChc?Math.max(pumpEnvelope,Number(dim.pumpW||0)):0;
+  const pumpset=isChc
     ?{length:chcLength?`${fmt(chcLength,0)} mm`:'-',width:chcWidth?`${fmt(chcWidth,0)} mm`:'-',height:dim.height?`${fmt(dim.height,0)} mm`:'-',weight:dim.weight?`${fmt(dim.weight,0)} kG`:'-'}
     :{length:esPs?.dimensions?.overall?.lengthMm?`${fmt(esPs.dimensions.overall.lengthMm,0)} mm`:'-',width:esPs?.dimensions?.overall?.widthMm?`${fmt(esPs.dimensions.overall.widthMm,0)} mm`:'-',height:esPs?.dimensions?.overall?.heightMm?`${fmt(esPs.dimensions.overall.heightMm,0)} mm`:'-',weight:esPs?.dimensions?.overall?.estimatedPumpsetWeightKg?`${fmt(esPs.dimensions.overall.estimatedPumpsetWeightKg,0)} kg`:'-'};
 
-  const displayBrand=String(displayIdentity?.brand||'B.G.Reich').trim()||'B.G.Reich',displaySeries=String(displayIdentity?.series||(fam==='CHC'?'CHC':'ES')).trim()||(fam==='CHC'?'CHC':'ES'),displayModel=String(displayIdentity?.model||model).trim()||model;
-  const pageArgs={family:fam,brand:displayBrand,series:displaySeries,model:displayModel,masterModel:model,dutyText,q,motorHp,motorKw,pole,hz,rpm,eff,npsh,brakeHp,suction,discharge,stages,impellerMm,maxPressure,dim,esPumpset:esPs,motorTech:mt,pumpset,material:materialFor(fam,displayIdentity?.material),charts};
+  const displayBrand=String(displayIdentity?.brand||'B.G.Reich').trim()||'B.G.Reich',displaySeries=String(displayIdentity?.series||(isChc?String(engine?.label||'CHC'):'ES')).trim()||(isChc?String(engine?.label||'CHC'):'ES'),displayModel=String(displayIdentity?.model||model).trim()||model;
+  const pageArgs={family:isChc?'CHC':fam,brand:displayBrand,series:displaySeries,model:displayModel,masterModel:model,dutyText,q,motorHp,motorKw,pole,hz,rpm,eff,npsh,brakeHp,suction,discharge,stages,impellerMm,maxPressure,dim,esPumpset:esPs,motorTech:mt,pumpset,material:materialFor(isChc?'CHC':fam,displayIdentity?.material),charts};
 
   const p1=pdf.addPage(LETTER);drawPage1(p1,logo,regular,bold,pageArgs);
   const p2=pdf.addPage(LETTER);drawPage2(p2,logo,font,bold,pageArgs);
-  const p3=pdf.addPage(LETTER);fam==='CHC'?drawPage3CHC(p3,logo,font,bold,pageArgs,dimImage):drawPage3ES(p3,logo,font,bold,pageArgs,dimImage);
+  const p3=pdf.addPage(LETTER);isChc?drawPage3CHC(p3,logo,font,bold,pageArgs,dimImage):drawPage3ES(p3,logo,font,bold,pageArgs,dimImage);
 
   pdf.setTitle(`${displayModel} Selection`);
   pdf.setSubject('KeySuite KeySelector frozen-layout pump performance report');
@@ -528,7 +536,7 @@ export async function generateCurvePdf(family:string,q:number,h:number,dutyText:
   return {
     bytes:new Uint8Array(bytes),filename:`${safe||fam}_Selection.pdf`,model:displayModel,master_model:model,brand:displayBrand,series:displaySeries,
     motor_kw:motorKw,motor_hp:motorHp,efficiency:eff,npshr:npsh,shaft_kw:selectionShaft,
-    pole:fam==='ES'?pole:null,rpm,selector_core_version:fam==='CHC'?CHC_CORE.VERSION:null,
+    pole:fam==='ES'?pole:null,rpm,selector_core_version:isChc?engine?.core?.VERSION:null,
     pdf_layout:'KeySelector frozen layout',pdf_layout_version:'4.12.20'
   };
 }

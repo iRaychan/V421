@@ -13,7 +13,7 @@
   if(window.top!==window.self||window.__KEYSUITE_V40001_CUSTOMER_BRAND_SETTINGS__)return;
   window.__KEYSUITE_V40001_CUSTOMER_BRAND_SETTINGS__=true;
 
-  const VERSION='4.21.01';
+  const VERSION='4.21.02';
   const $=id=>document.getElementById(id);
   const norm=v=>String(v??'').trim();
   const low=v=>norm(v).toLowerCase();
@@ -92,7 +92,7 @@
         return;
       }
       const groups=mappings().filter(m=>String(m.brand_id)===String(b.id)).map(m=>normalizeGroup(m.master_family));
-      // V4.21.01: CHC G1 and G2 are independent hydraulic Selection entries.
+      // V4.21.02: CHC G1 and G2 are independent hydraulic Selection entries.
       if(groups.includes('CHC_G1'))out.push({brand:b,family:'CHC',productGroup:'CHC_G1',key:keyOf(b.id,'CHC_G1')});
       if(groups.includes('CHC_G2')||groups.includes('CHC'))out.push({brand:b,family:'CHC',productGroup:'CHC_G2',key:keyOf(b.id,'CHC')});
       if(groups.includes('ES'))out.push({brand:b,family:'ES',productGroup:'ES',key:keyOf(b.id,'ES')});
@@ -154,7 +154,7 @@
     return priceBrands().filter(b=>allowed.has(String(b.id)));
   }
   function priceGroupLabel(group){
-    return ({CHC_G1:'CHC G1',CHC_G2:'CHC G2',ES:'End Suction',MOTOR:'Motor',BASEPLATE:'Baseplate',COUPLING:'Coupling',KEYPLC:'KeyPLC Panel',MANIFOLD:'Manifold',GWS:'GWS Tank'})[normalizedPriceGroup(group)]||String(group||'');
+    return ({CHC_G1:'CHC C4',CHC_G2:'CHC G2',ES:'End Suction',MOTOR:'Motor',BASEPLATE:'Baseplate',COUPLING:'Coupling',KEYPLC:'KeyPLC Panel',MANIFOLD:'Manifold',GWS:'GWS Tank'})[normalizedPriceGroup(group)]||String(group||'');
   }
   function priceEntrySeriesLabel(entry){
     if(entry.label)return String(entry.label);

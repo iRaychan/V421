@@ -1,4 +1,4 @@
-# KeySuite V4.21.01 FULL CLEAN
+# KeySuite V4.21.02 FULL CLEAN
 
 Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
@@ -22,5 +22,5 @@ Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 No SQL migration is required.
 
 
-## V4.21.01 CHC G1
-See `README_V42101.md` for the G1 hydraulic and V1.1 price-model changes.
+## V4.21.02 CHC G1
+See `README_V42102.md` for the G1 hydraulic and V1.1 price-model changes.
