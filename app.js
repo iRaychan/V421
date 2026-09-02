@@ -1387,7 +1387,7 @@ window.addEventListener('message',function(event){
  const p={...rawPayload};
  const route=event.data.route||pendingSelectionRoute||'quotation';pendingSelectionRoute='quotation';
  if(fromEs||isEsSelectionPayload(p)){void routeEsSelection(p,route).catch(error=>{console.error('ES selection routing failed',error);alert(error?.message||'Unable to route the ES selection.');});return}
- // V4.21.14: never let CHC C4/G1 silently fall back to C6/G2 pricing.
+ // V4.21.15: never let CHC C4/G1 silently fall back to C6/G2 pricing.
  // Prefer explicit selector identity; if an older cached selector omits it, use the active CHC generation.
  {
    const explicit=String(p.generation_code||p.keysuite_generation_code||'').toUpperCase();

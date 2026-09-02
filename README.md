@@ -1,4 +1,4 @@
-# KeySuite V4.21.14 FULL CLEAN
+# KeySuite V4.21.15 UPGRADE
 
 Full-clean continuation built from the verified KeySuite V4.20.01 baseline.
 
@@ -79,3 +79,10 @@ No database migration is required. Deploy the `telegram-webhook` Edge Function.
 - Fixes CHC C4/G1 Selection pricing handoff so C4 prices use CHC G1 rather than silently defaulting to G2.
 - Fixes KeyBot C4/G1 PDF motor efficiency label to IE2.
 - Corrects the V4.21.13 KeyPLC 3kW / 37kW SQL to use `KEYPLC-xxxx` text IDs.
+
+## V4.21.15
+- KeyBot End Suction guided Product flow now shows 2P and 4P buttons.
+- ES Pole / Series / Model drill-down uses the hydraulic ES database.
+- Manual pole typing remains a fallback only.
+- Redeploy `telegram-webhook`; no DB push required.
+

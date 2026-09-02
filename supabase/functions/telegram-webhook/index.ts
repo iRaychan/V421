@@ -874,24 +874,28 @@ async function guidedCatalogLevel(service:any,companyId:string,product:any,path:
     const models=filtered.map((r:any)=>choice('model',String(r.id||r.model),guidedAliasModel(r.model,presentation,group),{id:String(r.id||''),master_model:String(r.model||''),display_model:guidedAliasModel(r.model,presentation,group)})).sort((a:any,b:any)=>guidedNaturalCompare(a.label,b.label));return {title:`${guidedAliasModel(series,presentation,group)} — choose exact Model:`,choices:models,exact:true};
   }
   if(group==='ES'){
-    // V4.18.09 required ES hierarchy:
-    // End Suction -> Brand Series (ES) -> Pole -> ES Series -> exact ES Model.
+    // V4.21.15: the guided ES hierarchy must come from the hydraulic ES database,
+    // not the ES price table. The price table does not reliably carry pole/rpm,
+    // which previously produced a blank "Choose Pole" keyboard.
+    // End Suction -> Brand Series (ES) -> 2P/4P -> ES Series -> exact ES Model.
     const esBrandSeries=String(presentation.brandSeries||product?.brand_series||'ES').trim()||'ES';
     if(p.length===0)return {title:'Choose Series:',choices:[choice('brand_series',esBrandSeries,esBrandSeries)]};
+    const hydraulicRows:any[]=Array.isArray((globalThis as any).ES_SELECTOR_DB?.pumps)?(globalThis as any).ES_SELECTOR_DB.pumps:rows;
     const rowPole=(r:any)=>Number(r.pole||0)||(Number(r.rpm||0)>=2000?2:Number(r.rpm||0)>0?4:0);
     if(p.length===1){
-      const poles=guidedUnique(rows.map((r:any)=>rowPole(r)).filter((x:any)=>x===2||x===4).map((x:any)=>`${x} Pole`)).sort(guidedNaturalCompare);
-      return {title:'Choose Pole:',choices:poles.map(v=>choice('pole',v,v,{pole:Number(String(v).match(/\d+/)?.[0]||0)}))};
+      const actualPoles=[...new Set(hydraulicRows.map((r:any)=>rowPole(r)).filter((x:any)=>x===2||x===4))].sort();
+      const poles=actualPoles.length?actualPoles:[2,4];
+      return {title:'Choose Pole:',choices:poles.map((pole:number)=>choice('pole',`${pole}P`,`${pole}P`,{pole}))};
     }
     const pole=Number(p[1]?.meta?.pole||String(p[1]?.value||'').match(/\d+/)?.[0]||0);
-    let filtered=rows.filter((r:any)=>!pole||rowPole(r)===pole);
+    let filtered=hydraulicRows.filter((r:any)=>!pole||rowPole(r)===pole);
     if(p.length===2){
       const vals=guidedUnique(filtered.map((r:any)=>guidedEsSeries(r.model))).sort(guidedNaturalCompare);
-      return {title:`${pole?`${pole} Pole — `:''}Choose ES Series:`,choices:vals.map(v=>choice('es_series',v,guidedAliasModel(v,presentation,group),{pole}))};
+      return {title:`${pole?`${pole}P — `:''}Choose ES Series:`,choices:vals.map(v=>choice('es_series',v,guidedAliasModel(v,presentation,group),{pole}))};
     }
     const series=String(p[2]?.value||'');
     filtered=filtered.filter((r:any)=>guidedEsSeries(r.model).toLowerCase()===series.toLowerCase());
-    const models=filtered.map((r:any)=>{const actualPole=rowPole(r)||pole,base=guidedAliasModel(`ES ${String(r.model||'').replace(/^ES\s+/i,'')}`,presentation,group);return choice('model',String(r.id||r.model),base,{id:String(r.id||''),master_model:`ES ${String(r.model||'').replace(/^ES\s+/i,'')}`,display_model:base,pole:actualPole,rpm:Number(r.rpm||0)})}).sort((a:any,b:any)=>guidedNaturalCompare(a.label,b.label));
+    const models=filtered.map((r:any)=>{const actualPole=rowPole(r)||pole,master=`ES ${String(r.model||'').replace(/^ES\s+/i,'')}`,base=guidedAliasModel(master,presentation,group);return choice('model',String(r.id||`${master}-${actualPole}P`),base,{id:String(r.id||''),master_model:master,display_model:base,pole:actualPole,rpm:Number(r.rpm||0)})}).sort((a:any,b:any)=>guidedNaturalCompare(a.label,b.label));
     return {title:`${guidedAliasModel(series,presentation,group)} — choose exact ES Model:`,choices:models,exact:true};
   }
   if(group==='GWS'){
@@ -2002,7 +2006,7 @@ Deno.serve(async(req)=>{
     if(menuText||callbackData==='menu:home'){
       session=await saveKeybotSession(service,keySuiteCompanyId,chatId,senderId,{mode:'',step:'idle',flow_m3h:null,head_m:null,flow_raw:null,head_raw:null,selected_customer_id:null,context:{}});
       await telegramSend(telegramToken,chatId,`Hi 👋\n\n${simpleRequestMenuText()}`,mainMenuMarkup());
-      return json({ok:true,status:'keybot_menu',version:'V4.21.14'});
+      return json({ok:true,status:'keybot_menu',version:'V4.21.15'});
     }
     if(newRequestButton){
       session=await saveKeybotSession(service,keySuiteCompanyId,chatId,senderId,{mode:'',step:'idle',flow_m3h:null,head_m:null,flow_raw:null,head_raw:null,selected_customer_id:null,context:{}});
@@ -2165,7 +2169,14 @@ ${error instanceof Error?error.message:String(error)}`,mainMenuMarkup());return 
     if(!callbackQuery&&session?.mode==='guided'&&session?.step==='guided_catalog'&&text&&!quickSelectionButton&&!productButton){
       const user=await linkedKeySuiteUser(service,keySuiteCompanyId,senderId),customerId=String(session.selected_customer_id||''),customer=customerId?await guidedAllowedCustomerById(service,keySuiteCompanyId,user,customerId):null,c=sessionContext(session),product=c.guided_product,choices=Array.isArray(c.guided_catalog_choices)?c.guided_catalog_choices:[];if(!user||!product||(customerId&&!customer)){await telegramSend(telegramToken,chatId,'The guided Product session has expired. Start a New Request.',mainMenuMarkup());return json({ok:true,status:'guided_catalog_expired'})}
       if(cleanButton==='product'){try{session=await guidedStartCatalog(service,telegramToken,keySuiteCompanyId,chatId,senderId,session,customer,user,product);return json({ok:true,status:'guided_catalog_restart'})}catch(error){await telegramSend(telegramToken,chatId,String(error),customer?guidedSelectedCustomerMenu():mainMenuMarkup());return json({ok:true,status:'guided_catalog_restart_error'})}}
-      const selected=choices.find((x:any)=>cleanSearch(x.label)===cleanButton);if(!selected){await telegramSend(telegramToken,chatId,'Please choose one of the shown options.',guidedKeyboardForChoices(choices));return json({ok:true,status:'guided_catalog_waiting'})}
+      let selected=choices.find((x:any)=>cleanSearch(x.label)===cleanButton);
+      // V4.21.15: buttons are the normal path, but accept 2 / 2P / 2 Pole and
+      // 4 / 4P / 4 Pole as a typing fallback while waiting at the ES Pole step.
+      if(!selected&&String(product?.price_group||'').toUpperCase()==='ES'&&choices.some((x:any)=>x?.kind==='pole')){
+        const compact=cleanButton.replace(/\s+/g,''),m=compact.match(/^([24])(?:p|pole)?$/i),typedPole=Number(m?.[1]||0);
+        if(typedPole)selected=choices.find((x:any)=>x?.kind==='pole'&&Number(x?.meta?.pole||String(x?.value||'').match(/\d+/)?.[0]||0)===typedPole);
+      }
+      if(!selected){await telegramSend(telegramToken,chatId,'Please choose one of the shown options.',guidedKeyboardForChoices(choices));return json({ok:true,status:'guided_catalog_waiting'})}
       const currentPath=Array.isArray(c.guided_catalog_path)?c.guided_catalog_path:[];try{const currentLevel=await guidedCatalogLevel(service,keySuiteCompanyId,product,currentPath),path=[...currentPath,selected];if(currentLevel.exact&&(selected.kind==='model'||selected.kind==='pump_qty')){session=await guidedSaveExactCatalogChoice(service,telegramToken,keySuiteCompanyId,chatId,senderId,session,customer,product,path,selected,c);return json({ok:true,status:'guided_exact_model_ready'})}
         const resolved=await guidedResolveCatalogLevel(service,keySuiteCompanyId,product,path);if(resolved.exactChoice){session=await guidedSaveExactCatalogChoice(service,telegramToken,keySuiteCompanyId,chatId,senderId,session,customer,product,resolved.path,resolved.exactChoice,c);return json({ok:true,status:'guided_exact_model_ready_auto'})}
         const level=resolved.level,next=level.choices||[];session=await saveKeybotSession(service,keySuiteCompanyId,chatId,senderId,{mode:'guided',step:'guided_catalog',selected_customer_id:String(customer?.id||'')||null,context:{...c,guided_catalog_path:resolved.path,guided_catalog_choices:next}});await telegramSend(telegramToken,chatId,level.title,guidedKeyboardForChoices(next));return json({ok:true,status:'guided_catalog_next',count:next.length});
